@@ -11,12 +11,6 @@ export class AppError extends Error {
     }
 }
 
-export class UnauthorizedError extends AppError {
-    constructor(message: string = 'Unauthorized access') {
-        super(message, 401);
-    }
-}
-
 export const globalErrorHandler = (err: unknown, req: Request, res: Response, _next: NextFunction) => {
     if (err instanceof ZodError) {
         return res.status(400).json({
@@ -30,10 +24,10 @@ export const globalErrorHandler = (err: unknown, req: Request, res: Response, _n
 
     if (err instanceof AppError) {
         return res.status(err.statusCode).json({
-            error: err.message,
+            status: err.statusCode < 500 ? 'fail' : 'error',
+            message: err.message,
         });
     }
-
     console.error('ERROR:', err);
     return res.status(500).json({ error: 'Internal server error' });
 };

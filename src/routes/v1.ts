@@ -1,14 +1,12 @@
 import { Router } from 'express';
 import authRouter from '../modules/auth/auth.router';
-import { csrfGuard } from '../shared/middlewares/csrf.middleware';
+import movieRouter from '../modules/movies/movies.router';
 import { authenticate } from '../shared/middlewares/auth.middleware';
 
 const router = Router();
 
-// unprotected
-router.use('/auth', authRouter);
+router.use('/auth', authRouter); // can use csrf guard later myb...
 
-// protected
-router.use([authenticate, csrfGuard]);
+router.use('/movie', authenticate, movieRouter);
 
 export default router;
