@@ -40,6 +40,15 @@ export const ffprobe = async (filePath: string): Promise<FFprobeData> => {
 };
 
 export const transcode = async (inputPath: string, outputPath: string, targetHeight: number): Promise<string> => {
+    const limits: Record<number, { bitrate: string; buf: string }> = {
+        2160: { bitrate: '12M', buf: '24M' }, // 4K
+        1440: { bitrate: '8M', buf: '16M' }, // 2K
+        1080: { bitrate: '4M', buf: '8M' }, // Full HD
+        720: { bitrate: '2M', buf: '4M' }, // HD
+        480: { bitrate: '1M', buf: '2M' }, // SD
+    };
+    const config = limits[targetHeight] || { bitrate: '2M', buf: '4M' };
+
     const proc = Bun.spawn([
         'ffmpeg',
         '-v',
@@ -47,15 +56,21 @@ export const transcode = async (inputPath: string, outputPath: string, targetHei
         '-i',
         inputPath,
         '-vf',
-        `scale=-2:${targetHeight}`,
+        `scale=-2:${targetHeight}:flags=lanczos`,
         '-c:v',
         'libx264',
+        '-preset',
+        'veryfast',
         '-crf',
-        '23',
+        '20',
+        '-maxrate',
+        config.bitrate,
+        '-bufsize',
+        config.buf,
+        '-pix_fmt',
+        'yuv420p',
         '-movflags',
         '+faststart',
-        '-preset',
-        'medium',
         '-c:a',
         'aac',
         '-b:a',
