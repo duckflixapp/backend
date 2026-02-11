@@ -9,7 +9,7 @@ export const register = catchAsync(async (req: Request, res: Response) => {
 
     await AuthService.register(data.name, data.email, data.password);
 
-    return res.status(201).json({ message: 'User created' });
+    return res.status(201).json({ status: 'success' });
 });
 
 export const login = catchAsync(async (req: Request, res: Response) => {
@@ -32,7 +32,7 @@ export const login = catchAsync(async (req: Request, res: Response) => {
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7d
     });
 
-    return res.json({ message: 'Login successfull', user: result.user });
+    return res.json({ status: 'success', user: result.user });
 });
 
 export const logout = catchAsync(async (req: Request, res: Response) => {
@@ -43,7 +43,7 @@ export const logout = catchAsync(async (req: Request, res: Response) => {
     await AuthService.logout();
 
     res.clearCookie('auth_token');
-    return res.status(200).json({ message: 'Logged out' });
+    return res.status(200).json({ status: 'success' });
 });
 
 export const getMe = catchAsync(async (req: Request, res: Response) => {
@@ -53,5 +53,8 @@ export const getMe = catchAsync(async (req: Request, res: Response) => {
 
     const user = await AuthService.getMe(req.userId);
 
-    return res.json(user);
+    return res.status(200).json({
+        status: 'success',
+        data: { user },
+    });
 });

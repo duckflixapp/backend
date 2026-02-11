@@ -12,6 +12,7 @@ export const toMovieVersionDTO = (v: MovieVersion): MovieVersionDTO => ({
     fileSize: v.fileSize,
     mimeType: v.mimeType,
     streamUrl: `${BASE_URL}/media/stream/${v.id}`,
+    isOriginal: v.isOriginal,
 });
 
 export const toMovieDTO = (movie: Movie & { genres: { genre: Genre }[] }): MovieDTO => ({
