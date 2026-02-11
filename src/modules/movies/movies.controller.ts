@@ -6,17 +6,16 @@ import { createMovieSchema, movieParamsSchema, movieQuerySchema } from './movies
 
 export const upload = catchAsync(async (req: Request, res: Response) => {
     const file = req.file;
-    const { title } = createMovieSchema.parse(req.body);
-
+    const validatedData = createMovieSchema.parse(req.body);
     if (!file) throw new AppError('Video file is missing', 400);
 
     const movie = await MoviesService.initiateUpload({
         userId: req.userId!,
-        title,
         tempPath: file.path,
         originalName: file.originalname,
         mimeType: file.mimetype,
         fileSize: file.size,
+        ...validatedData,
     });
 
     res.status(201).json({

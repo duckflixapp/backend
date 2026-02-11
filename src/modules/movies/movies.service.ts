@@ -1,25 +1,28 @@
 import path from 'node:path';
 import fs from 'node:fs/promises';
-import { count, desc, eq, ilike } from 'drizzle-orm';
+import { count, desc, eq, ilike, inArray } from 'drizzle-orm';
 import { db } from '../../shared/db';
-import { movies, movieVersions } from '../../shared/schema';
+import { genres, movies, moviesToGenres, movieVersions } from '../../shared/schema';
 import { InvalidVideoFileError, MovieNotCreatedError, MovieNotFoundError } from './movies.errors';
 import { randomUUID } from 'node:crypto';
 import { ffprobe } from '../../shared/utils/videoProcessor';
 import { createMovieStorageKey, startProcessing } from './movies.processor';
 import type { MovieDetailedDTO, MovieDTO, PaginatedResponse } from '@duckflix/shared';
 import { toMovieDetailedDTO, toMovieDTO } from '../../shared/mappers/movies.mapper';
+import type { CreateMovieInput } from './movies.validator';
 
 const STORAGE_FOLDER = process.env.STORAGE_FOLDER ?? 'storage';
 
-export const initiateUpload = async (data: {
-    userId: string;
-    title: string;
-    tempPath: string;
-    originalName: string;
-    mimeType: string;
-    fileSize: number;
-}): Promise<MovieDTO> => {
+export const initiateUpload = async (
+    data: {
+        userId: string;
+        tempPath: string;
+        originalName: string;
+        mimeType: string;
+        fileSize: number;
+        genreIds: string[];
+    } & CreateMovieInput
+): Promise<MovieDTO> => {
     const metadata = await ffprobe(data.tempPath).catch(() => {
         throw new InvalidVideoFileError();
     });
@@ -29,10 +32,28 @@ export const initiateUpload = async (data: {
 
     const originalWidth = Number(videoStream.width) || 0;
     const originalHeight = Number(videoStream.height) || 0;
+    const duration = Math.round(Number(metadata.format.duration) || 0);
 
-    const [dbMovie] = await db.insert(movies).values({ title: data.title, status: 'processing', userId: data.userId }).returning();
+    const [dbMovie] = await db
+        .insert(movies)
+        .values({
+            title: data.title,
+            description: data.description,
+            bannerUrl: data.bannerUrl,
+            posterUrl: data.posterUrl,
+            rating: data.rating ? data.rating.toString() : null,
+            releaseYear: data.releaseYear,
+            duration,
+            status: 'processing',
+            userId: data.userId,
+        })
+        .returning();
     if (!dbMovie) throw new MovieNotCreatedError();
 
+    if (data.genreIds && data.genreIds.length > 0) {
+        const values = data.genreIds.map((genreId) => ({ movieId: dbMovie.id, genreId: genreId }));
+        await db.insert(moviesToGenres).values(values);
+    }
     const movieId = dbMovie.id;
 
     // create path for movie version
@@ -84,7 +105,11 @@ export const initiateUpload = async (data: {
 
     if (tasksToRun.size > 0) startProcessing(movieId, Array.from(tasksToRun), STORAGE_FOLDER, finalPath);
 
-    return toMovieDTO(dbMovie);
+    const selectedGenres = data.genreIds.length > 0 ? await db.select().from(genres).where(inArray(genres.id, data.genreIds)) : [];
+    return toMovieDTO({
+        ...dbMovie,
+        genres: selectedGenres.map((genre) => ({ genre })),
+    });
 };
 
 export const getMovies = async (page: number, limit: number, search?: string): Promise<PaginatedResponse<MovieDTO>> => {
@@ -94,7 +119,19 @@ export const getMovies = async (page: number, limit: number, search?: string): P
 
     const [totalResult, results] = await Promise.all([
         db.select({ value: count() }).from(movies).where(filters),
-        db.select().from(movies).where(filters).limit(limit).offset(offset).orderBy(desc(movies.createdAt)),
+        db.query.movies.findMany({
+            where: filters,
+            limit: limit,
+            offset: offset,
+            orderBy: [desc(movies.createdAt)],
+            with: {
+                genres: {
+                    with: {
+                        genre: true,
+                    },
+                },
+            },
+        }),
     ]);
 
     if (!totalResult[0]) throw new Error('DB Count() failed');
@@ -117,6 +154,11 @@ export const getMovieById = async (id: string): Promise<MovieDetailedDTO | null>
     const result = await db.query.movies.findFirst({
         where: eq(movies.id, id),
         with: {
+            genres: {
+                with: {
+                    genre: true,
+                },
+            },
             versions: true,
             user: {
                 columns: {

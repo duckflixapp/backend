@@ -8,7 +8,7 @@ const router = Router();
 
 router.use('/auth', authRouter); // can use csrf guard later myb...
 
-router.use('/movie', authenticate, movieRouter);
+router.use('/movies', authenticate, movieRouter);
 router.use('/media', authenticate, mediaRouter);
 
 export default router;

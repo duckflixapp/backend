@@ -2,7 +2,7 @@ import argon2 from 'argon2';
 import { db } from '../../shared/db';
 import { users } from '../../shared/schema';
 import { DrizzleQueryError, eq } from 'drizzle-orm';
-import { EmailAlreadyExistsError, InvalidCredentialsError, UserNotCreatedError } from './auth.errors';
+import { EmailAlreadyExistsError, InvalidCredentialsError, UserNotCreatedError, UserNotFoundError } from './auth.errors';
 import { DatabaseError } from 'pg';
 import type { UserDTO } from '@duckflix/shared';
 import { toUserDTO } from '../../shared/mappers/user.mapper';
@@ -43,4 +43,16 @@ export const login = async (email: string, pass: string): Promise<{ token: strin
     const token = signToken({ userId: user.id });
 
     return { token, user: toUserDTO(user) };
+};
+
+export const logout = async () => {
+    console.log('not implemented yet...');
+};
+
+export const getMe = async (userId: string) => {
+    const user = await db.query.users.findFirst({ where: eq(users.id, userId) });
+
+    if (!user) throw new UserNotFoundError();
+
+    return toUserDTO(user);
 };

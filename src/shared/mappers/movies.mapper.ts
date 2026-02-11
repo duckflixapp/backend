@@ -1,5 +1,5 @@
 import { toUserMinDTO } from './user.mapper';
-import type { Movie, MovieVersion } from '../schema';
+import type { Genre, Movie, MovieVersion } from '../schema';
 import type { MovieDetailedDTO, MovieDTO, MovieVersionDTO } from '@duckflix/shared';
 
 const BASE_URL = process.env.BASE_URL ?? '';
@@ -14,15 +14,29 @@ export const toMovieVersionDTO = (v: MovieVersion): MovieVersionDTO => ({
     streamUrl: `${BASE_URL}/media/stream/${v.id}`,
 });
 
-export const toMovieDTO = (movie: Movie): MovieDTO => ({
+export const toMovieDTO = (movie: Movie & { genres: { genre: Genre }[] }): MovieDTO => ({
     id: movie.id,
     title: movie.title,
+    bannerUrl: movie.bannerUrl,
+    posterUrl: movie.posterUrl,
+    rating: movie.rating,
+    releaseYear: movie.releaseYear,
+    duration: movie.duration,
+    genres: movie.genres.map((g) => toGenreDTO(g.genre)),
     status: movie.status,
     createdAt: movie.createdAt.toISOString(),
 });
 
-export const toMovieDetailedDTO = (movie: Movie & { versions: MovieVersion[]; user: { id: string; name: string } }): MovieDetailedDTO => ({
+export const toGenreDTO = (genre: Genre) => ({
+    id: genre.id,
+    name: genre.name,
+});
+
+export const toMovieDetailedDTO = (
+    movie: Movie & { genres: { genre: Genre }[]; versions: MovieVersion[]; user: { id: string; name: string } }
+): MovieDetailedDTO => ({
     ...toMovieDTO(movie),
+    description: movie.description,
     user: toUserMinDTO(movie.user),
     versions: movie.versions.map(toMovieVersionDTO),
 });

@@ -26,9 +26,32 @@ export const login = catchAsync(async (req: Request, res: Response) => {
         sameSite: 'lax',
     });
     res.cookie('csrf_token', csrfToken, {
+        httpOnly: false,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7d
     });
 
     return res.json({ message: 'Login successfull', user: result.user });
+});
+
+export const logout = catchAsync(async (req: Request, res: Response) => {
+    if (!req.userId) {
+        return res.status(401).json({ message: 'Not authenticated' });
+    }
+
+    await AuthService.logout();
+
+    res.clearCookie('auth_token');
+    return res.status(200).json({ message: 'Logged out' });
+});
+
+export const getMe = catchAsync(async (req: Request, res: Response) => {
+    if (!req.userId) {
+        return res.status(401).json({ message: 'Not authenticated' });
+    }
+
+    const user = await AuthService.getMe(req.userId);
+
+    return res.json(user);
 });

@@ -1,5 +1,5 @@
 import { relations, type InferSelectModel } from 'drizzle-orm';
-import { bigint, boolean, index, integer, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { bigint, boolean, decimal, index, integer, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 export const users = pgTable('users', {
     id: uuid('id').defaultRandom().primaryKey(),
@@ -17,6 +17,12 @@ export const movies = pgTable(
     {
         id: uuid('id').defaultRandom().primaryKey(),
         title: text('title').notNull(),
+        description: text('description'),
+        bannerUrl: text('banner_url'),
+        posterUrl: text('poster_url'),
+        rating: decimal('rating', { precision: 3, scale: 1 }).default('0.0'),
+        releaseYear: integer('release_year'),
+        duration: integer('duration').notNull(), // seconds
         status: text('status').$type<'processing' | 'ready' | 'error'>().default('processing').notNull(),
         userId: uuid('user_id')
             .notNull()
@@ -24,6 +30,25 @@ export const movies = pgTable(
         createdAt: timestamp('created_at').notNull().defaultNow(),
     },
     (table) => [index('title_idx').on(table.title), index('created_at_idx').on(table.createdAt)]
+);
+
+export const genres = pgTable('genres', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    name: text('name').notNull().unique(),
+});
+
+// pivot table
+export const moviesToGenres = pgTable(
+    'movies_to_genres',
+    {
+        movieId: uuid('movie_id')
+            .notNull()
+            .references(() => movies.id, { onDelete: 'cascade' }),
+        genreId: uuid('genre_id')
+            .notNull()
+            .references(() => genres.id, { onDelete: 'cascade' }),
+    },
+    (t) => [index('movie_genre_idx').on(t.movieId, t.genreId)]
 );
 
 export const movieVersions = pgTable('movie_versions', {
@@ -47,6 +72,22 @@ export const moviesRelations = relations(movies, ({ one, many }) => ({
         references: [users.id],
     }),
     versions: many(movieVersions),
+    genres: many(moviesToGenres),
+}));
+
+export const genresRelations = relations(genres, ({ many }) => ({
+    movies: many(moviesToGenres),
+}));
+
+export const moviesToGenresRelations = relations(moviesToGenres, ({ one }) => ({
+    movie: one(movies, {
+        fields: [moviesToGenres.movieId],
+        references: [movies.id],
+    }),
+    genre: one(genres, {
+        fields: [moviesToGenres.genreId],
+        references: [genres.id],
+    }),
 }));
 
 export const movieVersionsRelations = relations(movieVersions, ({ one }) => ({
@@ -57,5 +98,6 @@ export const movieVersionsRelations = relations(movieVersions, ({ one }) => ({
 }));
 
 export type Movie = InferSelectModel<typeof movies>;
+export type Genre = InferSelectModel<typeof genres>;
 export type MovieVersion = InferSelectModel<typeof movieVersions>;
 export type NewMovieVersion = typeof movieVersions.$inferInsert;
