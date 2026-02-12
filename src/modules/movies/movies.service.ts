@@ -1,6 +1,6 @@
 import path from 'node:path';
 import fs from 'node:fs/promises';
-import { count, desc, eq, ilike, inArray } from 'drizzle-orm';
+import { and, count, desc, eq, ilike, inArray } from 'drizzle-orm';
 import { db } from '../../shared/db';
 import { genres, movies, moviesToGenres, movieVersions } from '../../shared/schema';
 import { InvalidVideoFileError, MovieNotCreatedError, MovieNotFoundError } from './movies.errors';
@@ -16,24 +16,8 @@ const STORAGE_FOLDER = process.env.STORAGE_FOLDER ?? 'storage';
 export const initiateUpload = async (
     data: {
         userId: string;
-        tempPath: string;
-        originalName: string;
-        mimeType: string;
-        fileSize: number;
-        genreIds: string[];
     } & CreateMovieInput
 ): Promise<MovieDTO> => {
-    const metadata = await ffprobe(data.tempPath).catch(() => {
-        throw new InvalidVideoFileError();
-    });
-
-    const videoStream = metadata.streams.find((s) => s.codec_type === 'video');
-    if (!videoStream) throw new InvalidVideoFileError();
-
-    const originalWidth = Number(videoStream.width) || 0;
-    const originalHeight = Number(videoStream.height) || 0;
-    const duration = Math.round(Number(metadata.format.duration) || 0);
-
     const [dbMovie] = await db
         .insert(movies)
         .values({
@@ -41,9 +25,9 @@ export const initiateUpload = async (
             description: data.description,
             bannerUrl: data.bannerUrl,
             posterUrl: data.posterUrl,
-            rating: data.rating ? data.rating.toString() : null,
+            rating: null,
             releaseYear: data.releaseYear,
-            duration,
+            duration: null,
             status: 'processing',
             userId: data.userId,
         })
@@ -54,12 +38,54 @@ export const initiateUpload = async (
         const values = data.genreIds.map((genreId) => ({ movieId: dbMovie.id, genreId: genreId }));
         await db.insert(moviesToGenres).values(values);
     }
-    const movieId = dbMovie.id;
+
+    const selectedGenres = data.genreIds.length > 0 ? await db.select().from(genres).where(inArray(genres.id, data.genreIds)) : [];
+    return toMovieDTO({
+        ...dbMovie,
+        genres: selectedGenres.map((genre) => ({ genre })),
+    });
+};
+
+export const processMagnetWorkflow = async (data: { movieId: string; magnet: string }) => {
+    throw new Error(`not implemeneted! ${JSON.stringify(data)}`);
+    // download...
+    // await processMovieWorkflow(data);
+};
+
+export const processMovieWorkflow = async (data: {
+    movieId: string;
+    tempPath: string;
+    originalName: string;
+    mimeType: string;
+    fileSize: number;
+}): Promise<void> => {
+    let metadata, videoStream;
+    try {
+        metadata = await ffprobe(data.tempPath).catch(async () => {
+            throw new InvalidVideoFileError();
+        });
+
+        const formatName = metadata.format.format_name;
+        if (formatName?.includes('image') || formatName === 'png' || formatName === 'mjpeg') throw new InvalidVideoFileError();
+
+        videoStream = metadata.streams.find((s) => s.codec_type === 'video');
+        if (!videoStream) throw new InvalidVideoFileError();
+
+        const duration = Number(metadata.format.duration) || 0;
+        if (duration < 2) throw new InvalidVideoFileError();
+    } catch (err) {
+        await fs.unlink(data.tempPath).catch(() => {});
+        throw err;
+    }
+
+    const originalWidth = Number(videoStream.width) || 0;
+    const originalHeight = Number(videoStream.height) || 0;
+    const duration = Math.round(Number(metadata.format.duration) || 0);
 
     // create path for movie version
     const fileExt = path.extname(data.originalName);
     const originalId = randomUUID();
-    const storageKey = createMovieStorageKey(movieId, originalId, fileExt);
+    const storageKey = createMovieStorageKey(data.movieId, originalId, fileExt);
     const finalPath = path.join(STORAGE_FOLDER, storageKey);
 
     try {
@@ -70,7 +96,7 @@ export const initiateUpload = async (
         await db.transaction(async (tx) => {
             await tx.insert(movieVersions).values({
                 id: originalId,
-                movieId: movieId,
+                movieId: data.movieId,
                 width: originalWidth,
                 height: originalHeight,
                 isOriginal: true,
@@ -79,12 +105,10 @@ export const initiateUpload = async (
                 mimeType: data.mimeType,
                 status: 'ready',
             });
-            await tx.update(movies).set({ status: 'ready' }).where(eq(movies.id, movieId));
+            await tx.update(movies).set({ duration, status: 'ready' }).where(eq(movies.id, data.movieId));
         });
     } catch (err) {
-        await db.delete(movies).where(eq(movies.id, movieId));
         await fs.unlink(finalPath).catch(() => {});
-
         throw err;
     }
 
@@ -103,19 +127,17 @@ export const initiateUpload = async (
     if (originalHeight > 1080) tasksToRun.add(1080);
     if (originalHeight > 720) tasksToRun.add(720);
 
-    if (tasksToRun.size > 0) startProcessing(movieId, Array.from(tasksToRun), STORAGE_FOLDER, finalPath);
-
-    const selectedGenres = data.genreIds.length > 0 ? await db.select().from(genres).where(inArray(genres.id, data.genreIds)) : [];
-    return toMovieDTO({
-        ...dbMovie,
-        genres: selectedGenres.map((genre) => ({ genre })),
-    });
+    if (tasksToRun.size > 0) startProcessing(data.movieId, Array.from(tasksToRun), STORAGE_FOLDER, finalPath);
 };
 
 export const getMovies = async (page: number, limit: number, search?: string): Promise<PaginatedResponse<MovieDTO>> => {
     const offset = (page - 1) * limit;
 
-    const filters = search ? ilike(movies.title, `%${search}%`) : undefined;
+    const searchFilter = search ? ilike(movies.title, `%${search}%`) : null;
+    const readyFilter = eq(movies.status, 'ready');
+
+    const conditions = [searchFilter, readyFilter];
+    const filters = and(...conditions.filter((cond) => cond != null));
 
     const [totalResult, results] = await Promise.all([
         db.select({ value: count() }).from(movies).where(filters),
