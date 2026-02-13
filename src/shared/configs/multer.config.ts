@@ -1,17 +1,36 @@
 import multer from 'multer';
 import { AppError } from '../../shared/errors';
 import type { Multer } from 'multer';
-
-const UPLOADS_FOLDER = process.env.UPLOADS_FOLDER ?? 'uploads';
-const FILE_LIMIT_MB = process.env.UPLOAD_FILE_LIMIT ? Number(process.env.UPLOAD_FILE_LIMIT) : 16384; // 16GB limit per upload by default
+import { paths } from './path.config';
+import { limits } from './limits.config';
 
 export const movieUpload: Multer = multer({
-    dest: UPLOADS_FOLDER + '/temp/',
+    dest: paths.uploads,
     limits: {
-        fileSize: 1024 * 1024 * FILE_LIMIT_MB,
+        fileSize: 1024 * 1024 * limits.file.upload,
     },
     fileFilter: (req, file, cb) => {
-        if (file.mimetype.startsWith('video/') || file.mimetype === 'application/octet-stream') cb(null, true);
-        else cb(new AppError('Only video files (mp4, mkv, avi, mov) are allowed', 400) as unknown as null, false);
+        if (file.fieldname === 'video') {
+            if (file.mimetype.startsWith('video/') || file.mimetype === 'application/octet-stream') return cb(null, true);
+            return cb(new AppError('The "video" field must contain a valid video file.', 400) as unknown as null, false);
+        }
+        if (file.fieldname === 'torrent') {
+            const contentLength = parseInt(req.headers['content-length'] || '0');
+
+            // If whole request is 5MB .torrent file is probably malicious
+            if (contentLength > 5 * 1024 * 1024) {
+                return cb(new AppError('Torrent file is suspiciously large', 400) as unknown as null, false);
+            }
+
+            const isTorrentMime = file.mimetype === 'application/x-bittorrent';
+            const isTorrentExt = file.originalname.toLowerCase().endsWith('.torrent');
+
+            if (isTorrentMime || isTorrentExt) {
+                return cb(null, true);
+            }
+            return cb(new AppError('The "torrent" field must contain a .torrent file.', 400) as unknown as null, false);
+        }
+
+        cb(new AppError('Only video files (mp4, mkv, avi, mov) are allowed', 400) as unknown as null, false);
     },
 });

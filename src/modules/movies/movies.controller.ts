@@ -8,31 +8,32 @@ import { handleWorkflowError } from './movies.handler';
 
 export const upload = catchAsync(async (req: Request, res: Response) => {
     const validatedData = createMovieSchema.parse(req.body);
-    const file = req.file;
-    const magnet = validatedData.magnet;
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] };
 
-    if (!file && !magnet) throw new AppError('Please provide either a video file or a magnet link', 400);
+    const videoFile = files?.['video']?.[0];
+    const torrentFile = files?.['torrent']?.[0];
+
+    if (!videoFile && !torrentFile) throw new AppError('Please provide either a video file or a magnet link', 400);
 
     const movie = await MoviesService.initiateUpload({ userId: req.userId!, ...validatedData });
 
-    if (file)
+    if (videoFile)
         MoviesService.processMovieWorkflow({
             movieId: movie.id,
-            tempPath: file.path,
-            originalName: file.originalname,
-            mimeType: file.mimetype,
-            fileSize: file.size,
+            tempPath: videoFile.path,
+            originalName: videoFile.originalname,
+            fileSize: videoFile.size,
         }).catch((e) => handleWorkflowError(movie.id, e, 'movie'));
-    else {
-        MoviesService.processMagnetWorkflow({
+    else if (torrentFile?.path) {
+        MoviesService.processTorrentFileWorkflow({
             movieId: movie.id,
-            magnet: magnet!,
+            torrentPath: torrentFile?.path,
         }).catch((e) => handleWorkflowError(movie.id, e, 'torrent'));
-    }
+    } else throw new Error('Please provide valid video file or torrent');
 
     res.status(201).json({
         status: 'success',
-        message: magnet ? 'Magnet download initiated.' : 'Video processing started.',
+        message: torrentFile ? 'Torrent download initiated.' : 'Video processing started.',
         data: { movie },
     });
 });

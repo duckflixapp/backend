@@ -6,8 +6,25 @@ import { ffprobe, transcode } from '../../shared/utils/videoProcessor';
 import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { VideoProcessingError } from './movies.errors';
+import { TaskHandler } from '../../shared/utils/tasks';
+import { handleMovieTask, handleProcessingError } from './movies.handler';
 
 export const createMovieStorageKey = (movieId: string, versionId: string, ext: string) => `movies/${movieId}/${versionId}${ext}`;
+
+const taskHandler = new TaskHandler();
+const taskMovies = new Map<string, string>();
+
+taskHandler.addListener('started', (taskId) => handleMovieTask(taskMovies.get(taskId)!, taskId, 'started'));
+taskHandler.addListener('completed', (taskId) => handleMovieTask(taskMovies.get(taskId)!, taskId, 'completed'));
+taskHandler.addListener('error', (taskId, e) => handleProcessingError(taskMovies.get(taskId)!, e, 'task')); // this should be already catched in func handleVideoProcess
+
+const handleVideoProcess = (movieVer: MovieVersion, originalPath: string, outputPath: string) => {
+    const runnable = () => processTask(movieVer, originalPath, outputPath).catch((e) => handleProcessingError(movieVer.id, e, 'transcode'));
+
+    const taskId = randomUUID();
+    taskMovies.set(taskId, movieVer.id);
+    taskHandler.handle(runnable, taskId);
+};
 
 export const startProcessing = async (movieId: string, tasksToRun: number[], storageFolder: string, originalPath: string) => {
     // insert tasks into db
@@ -23,17 +40,17 @@ export const startProcessing = async (movieId: string, tasksToRun: number[], sto
             storageKey,
             fileSize: 0,
             mimeType: 'video/mp4',
-            status: 'processing' as const,
+            status: 'waiting' as const,
         };
     });
-    const processingTasks = await db.insert(movieVersions).values(tasksVersions).returning();
+    const waitingTasks: MovieVersion[] = await db.insert(movieVersions).values(tasksVersions).returning();
 
-    // process one by one
-    for (const task of processingTasks) await processTask(task, originalPath, path.join(storageFolder, task.storageKey));
+    waitingTasks.forEach((task) => handleVideoProcess(task, originalPath, path.join(storageFolder, task.storageKey)));
 };
 
 const processTask = async (task: MovieVersion, originalPath: string, outputPath: string) => {
     try {
+        await db.update(movieVersions).set({ status: 'processing' }).where(eq(movieVersions.id, task.id));
         // transcode process
         await transcode(originalPath, outputPath, task.height);
         const stats = await fs.stat(outputPath);
@@ -56,9 +73,6 @@ const processTask = async (task: MovieVersion, originalPath: string, outputPath:
             .where(eq(movieVersions.id, task.id));
     } catch (error) {
         const processingError = new VideoProcessingError(error instanceof Error ? error.message : 'Unknown transcode error');
-
-        console.error(`[MovieID: ${task.movieId}] ${processingError.message}`);
-
-        await db.update(movieVersions).set({ status: 'error' }).where(eq(movieVersions.id, task.id));
+        throw processingError;
     }
 };

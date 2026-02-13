@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { spawn } from './thread.utils';
 
 export interface FFprobeStream {
     index: number;
@@ -26,11 +27,10 @@ export interface FFprobeData {
 
 export const ffprobe = async (filePath: string): Promise<FFprobeData> => {
     const absolutePath = path.resolve(filePath);
-    const proc = Bun.spawn(['ffprobe', '-v', 'quiet', '-print_format', 'json', '-show_streams', '-show_format', absolutePath]);
+    const proc = await spawn('ffprobe', ['-v', 'quiet', '-print_format', 'json', '-show_streams', '-show_format', absolutePath]);
 
-    const text = await new Response(proc.stdout).text();
-
-    const exitCode = await proc.exited;
+    const text = await proc.getStdout();
+    const exitCode = await proc.wait();
 
     if (exitCode !== 0) {
         throw new Error('FFprobe failed to read file');
@@ -42,15 +42,14 @@ export const ffprobe = async (filePath: string): Promise<FFprobeData> => {
 export const transcode = async (inputPath: string, outputPath: string, targetHeight: number): Promise<string> => {
     const limits: Record<number, { bitrate: string; buf: string }> = {
         2160: { bitrate: '12M', buf: '24M' }, // 4K
-        1440: { bitrate: '8M', buf: '16M' }, // 2K
-        1080: { bitrate: '4M', buf: '8M' }, // Full HD
+        1440: { bitrate: '8M', buf: '16M' }, // UHD
+        1080: { bitrate: '4M', buf: '8M' }, // FHD
         720: { bitrate: '2M', buf: '4M' }, // HD
         480: { bitrate: '1M', buf: '2M' }, // SD
     };
     const config = limits[targetHeight] || { bitrate: '2M', buf: '4M' };
 
-    const proc = Bun.spawn([
-        'ffmpeg',
+    const proc = await spawn('ffmpeg', [
         '-v',
         'error',
         '-i',
@@ -79,8 +78,8 @@ export const transcode = async (inputPath: string, outputPath: string, targetHei
         outputPath,
     ]);
 
-    await proc.exited;
+    const exitCode = await proc.wait();
 
-    if (proc.exitCode !== 0) throw new Error(`FFmpeg transcoding failed for height ${targetHeight}`);
+    if (exitCode !== 0) throw new Error(`FFmpeg transcoding failed for height ${targetHeight}`);
     return outputPath;
 };

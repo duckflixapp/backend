@@ -10,8 +10,10 @@ import { createMovieStorageKey, startProcessing } from './movies.processor';
 import type { MovieDetailedDTO, MovieDTO, PaginatedResponse } from '@duckflix/shared';
 import { toMovieDetailedDTO, toMovieDTO } from '../../shared/mappers/movies.mapper';
 import type { CreateMovieInput } from './movies.validator';
-
-const STORAGE_FOLDER = process.env.STORAGE_FOLDER ?? 'storage';
+import { getMimeTypeFromFormat } from '../../shared/utils/ffmpeg';
+import { paths } from '../../shared/configs/path.config';
+import { AppError } from '../../shared/errors';
+import { downloadTorrent, validateTorrentSize } from '../../shared/utils/torrent';
 
 export const initiateUpload = async (
     data: {
@@ -46,17 +48,53 @@ export const initiateUpload = async (
     });
 };
 
-export const processMagnetWorkflow = async (data: { movieId: string; magnet: string }) => {
-    throw new Error(`not implemeneted! ${JSON.stringify(data)}`);
-    // download...
-    // await processMovieWorkflow(data);
+export const processTorrentFileWorkflow = async (data: { movieId: string; torrentPath: string }) => {
+    let torrentBuffer: Buffer;
+    try {
+        const valid = await validateTorrentSize(data.torrentPath);
+        if (!valid) throw new AppError('Torrent file is too large', 400);
+
+        torrentBuffer = await fs.readFile(data.torrentPath);
+    } catch (err) {
+        throw err;
+    } finally {
+        await fs.unlink(data.torrentPath).catch(() => {});
+    }
+
+    const sessionFolder = path.join(paths.downloads, data.movieId);
+    await fs.mkdir(sessionFolder, { recursive: true });
+
+    const torrent = await downloadTorrent(torrentBuffer, sessionFolder, (progress, speed) => {
+        console.log(`Download progress: ${progress}@${speed}`);
+    });
+
+    let safePath, mainFile;
+    try {
+        mainFile = torrent.files.reduce((p, c) => (p.length > c.length ? p : c));
+        const downloadedPath = path.join(torrent.path, mainFile.path);
+
+        const ext = path.extname(mainFile.name);
+        safePath = path.join(paths.downloads, `${data.movieId}-torrent${ext}`);
+        await fs.rename(downloadedPath, safePath);
+    } catch (err) {
+        throw err;
+    } finally {
+        torrent.destroy();
+        await fs.rm(sessionFolder, { recursive: true, force: true }).catch(() => {});
+    }
+
+    await processMovieWorkflow({
+        movieId: data.movieId,
+        tempPath: safePath,
+        originalName: mainFile.name,
+        fileSize: mainFile.length,
+    });
 };
 
 export const processMovieWorkflow = async (data: {
     movieId: string;
     tempPath: string;
     originalName: string;
-    mimeType: string;
     fileSize: number;
 }): Promise<void> => {
     let metadata, videoStream;
@@ -81,12 +119,13 @@ export const processMovieWorkflow = async (data: {
     const originalWidth = Number(videoStream.width) || 0;
     const originalHeight = Number(videoStream.height) || 0;
     const duration = Math.round(Number(metadata.format.duration) || 0);
+    const mimeType = getMimeTypeFromFormat(metadata.format.format_name);
 
     // create path for movie version
     const fileExt = path.extname(data.originalName);
     const originalId = randomUUID();
     const storageKey = createMovieStorageKey(data.movieId, originalId, fileExt);
-    const finalPath = path.join(STORAGE_FOLDER, storageKey);
+    const finalPath = path.join(paths.storage, storageKey);
 
     try {
         await fs.mkdir(path.dirname(finalPath), { recursive: true });
@@ -102,7 +141,7 @@ export const processMovieWorkflow = async (data: {
                 isOriginal: true,
                 storageKey: storageKey,
                 fileSize: data.fileSize,
-                mimeType: data.mimeType,
+                mimeType,
                 status: 'ready',
             });
             await tx.update(movies).set({ duration, status: 'ready' }).where(eq(movies.id, data.movieId));
@@ -114,7 +153,7 @@ export const processMovieWorkflow = async (data: {
 
     const tasksToRun = new Set<number>();
     // process original resolution if not mp4
-    if (data.mimeType != 'video/mp4') {
+    if (mimeType != 'video/mp4') {
         // try to keep standardized resolutions
         if (originalHeight >= 2160) tasksToRun.add(2160);
         else if (originalHeight >= 1440) tasksToRun.add(1440);
@@ -125,9 +164,9 @@ export const processMovieWorkflow = async (data: {
 
     // process tasks for lower resolutions
     if (originalHeight > 1080) tasksToRun.add(1080);
-    if (originalHeight > 720) tasksToRun.add(720);
+    else if (originalHeight > 720) tasksToRun.add(720);
 
-    if (tasksToRun.size > 0) startProcessing(data.movieId, Array.from(tasksToRun), STORAGE_FOLDER, finalPath);
+    if (tasksToRun.size > 0) startProcessing(data.movieId, Array.from(tasksToRun), paths.storage, finalPath);
 };
 
 export const getMovies = async (page: number, limit: number, search?: string): Promise<PaginatedResponse<MovieDTO>> => {

@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
-import { TokenExpiredError } from 'jsonwebtoken';
+import jwt from 'jsonwebtoken';
 import { catchAsync } from '../utils/catchAsync';
 import { AppError } from '../errors';
 import { csrfGuard } from './csrf.middleware';
@@ -23,7 +23,7 @@ export const authenticate = catchAsync(async (req: Request, res: Response, next:
 
         csrfGuard(req, res, next); // automatically use csrf guard
     } catch (err: unknown) {
-        if (err instanceof TokenExpiredError) throw new UnauthorizedError('Expired token');
+        if (err instanceof jwt.TokenExpiredError) throw new UnauthorizedError('Expired token');
         throw new UnauthorizedError('Invalid token');
     }
 });

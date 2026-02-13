@@ -6,6 +6,8 @@
     "scripts": {
         "dev": "bun --hot src/server.ts",
         "start": "bun src/server.ts",
+        "dev:tsx": "tsx watch --env-file=.env src/server.ts",
+        "start:tsx": "tsx --env-file=.env src/server.ts",
         "db:push": "bun drizzle-kit push",
         "db:studio": "bun drizzle-kit studio"
     },
@@ -33,6 +35,7 @@
         "jsonwebtoken": "^9.0.3",
         "multer": "^2.0.2",
         "pg": "^8.18.0",
+        "tsx": "^4.21.0",
         "webtorrent": "^2.8.5",
         "zod": "^4.3.6"
     }
