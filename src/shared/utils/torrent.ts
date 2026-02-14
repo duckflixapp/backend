@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import type { Torrent } from 'webtorrent';
 import WebTorrent from 'webtorrent';
 
-const client = new WebTorrent();
+const client = new WebTorrent({ lsd: false });
 
 const defaultMaxSize = 1024 * 1024 * 2; // 2MB
 export const validateTorrentSize = async (torrentPath: string, maxSize: number = defaultMaxSize) => {
@@ -27,11 +27,18 @@ export const downloadTorrent = (
     return new Promise((resolve, reject) => {
         try {
             client.add(buffer, { path: downloadPath }, (torrent) => {
-                torrent.on('download', () => onProgress && onProgress(torrent.progress * 100, torrent.downloadSpeed));
+                const progressHandler = () => {
+                    if (onProgress) onProgress(torrent.progress * 100, torrent.downloadSpeed);
+                };
 
-                torrent.on('done', () => resolve(torrent));
+                torrent.on('download', progressHandler);
+                torrent.once('done', () => {
+                    torrent.removeListener('download', progressHandler);
+                    resolve(torrent);
+                });
 
-                torrent.on('error', (err) => {
+                torrent.once('error', (err) => {
+                    torrent.removeAllListeners();
                     torrent.destroy();
                     reject(err);
                 });
