@@ -1,9 +1,10 @@
 import type { Request, Response } from 'express';
-import * as MoviesService from './movies.service';
-import * as GenresService from './genres.service';
+import * as MoviesService from './services/movies.service';
+import * as GenresService from './services/genres.service';
+import * as MetadataService from './services/metadata.service';
 import { catchAsync } from '../../shared/utils/catchAsync';
 import { AppError } from '../../shared/errors';
-import { createMovieSchema, movieParamsSchema, movieQuerySchema } from './movies.validator';
+import { createMovieSchema, movieParamsSchema, movieQuerySchema } from './validators/movies.validator';
 import { handleWorkflowError } from './movies.handler';
 
 export const upload = catchAsync(async (req: Request, res: Response) => {
@@ -12,10 +13,11 @@ export const upload = catchAsync(async (req: Request, res: Response) => {
 
     const videoFile = files?.['video']?.[0];
     const torrentFile = files?.['torrent']?.[0];
-
     if (!videoFile && !torrentFile) throw new AppError('Please provide either a video file or a magnet link', 400);
 
-    const movie = await MoviesService.initiateUpload({ userId: req.userId!, ...validatedData });
+    const metadata = await MetadataService.enrichMetadata(validatedData.dbUrl, validatedData);
+
+    const movie = await MoviesService.initiateUpload({ userId: req.userId!, ...metadata });
 
     if (videoFile)
         MoviesService.processMovieWorkflow({

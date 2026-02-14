@@ -1,30 +1,30 @@
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { and, count, desc, eq, ilike, inArray } from 'drizzle-orm';
-import { db } from '../../shared/db';
-import { genres, movies, moviesToGenres, movieVersions } from '../../shared/schema';
-import { InvalidVideoFileError, MovieNotCreatedError, MovieNotFoundError } from './movies.errors';
+import { db } from '../../../shared/db';
+import { genres, movies, moviesToGenres, movieVersions } from '../../../shared/schema';
+import { InvalidVideoFileError, MovieNotCreatedError, MovieNotFoundError } from '../movies.errors';
 import { randomUUID } from 'node:crypto';
-import { ffprobe } from '../../shared/utils/videoProcessor';
-import { createMovieStorageKey, startProcessing } from './movies.processor';
+import { ffprobe } from '../../../shared/utils/videoProcessor';
+import { createMovieStorageKey, startProcessing } from '../movies.processor';
 import type { MovieDetailedDTO, MovieDTO, PaginatedResponse } from '@duckflix/shared';
-import { toMovieDetailedDTO, toMovieDTO } from '../../shared/mappers/movies.mapper';
-import type { CreateMovieInput } from './movies.validator';
-import { getMimeTypeFromFormat } from '../../shared/utils/ffmpeg';
-import { paths } from '../../shared/configs/path.config';
-import { AppError } from '../../shared/errors';
-import { downloadTorrent, validateTorrentSize } from '../../shared/utils/torrent';
+import { toMovieDetailedDTO, toMovieDTO } from '../../../shared/mappers/movies.mapper';
+import { getMimeTypeFromFormat } from '../../../shared/utils/ffmpeg';
+import { paths } from '../../../shared/configs/path.config';
+import { AppError } from '../../../shared/errors';
+import { downloadTorrent, formatSpeed, validateTorrentSize } from '../../../shared/utils/torrent';
+import type { VideoMetadata } from './metadata.service';
 
 export const initiateUpload = async (
     data: {
         userId: string;
-    } & CreateMovieInput
+    } & VideoMetadata
 ): Promise<MovieDTO> => {
     const [dbMovie] = await db
         .insert(movies)
         .values({
             title: data.title,
-            description: data.description,
+            description: data.overview,
             bannerUrl: data.bannerUrl,
             posterUrl: data.posterUrl,
             rating: null,
@@ -65,7 +65,12 @@ export const processTorrentFileWorkflow = async (data: { movieId: string; torren
     await fs.mkdir(sessionFolder, { recursive: true });
 
     const torrent = await downloadTorrent(torrentBuffer, sessionFolder, (progress, speed) => {
-        console.log(`Download progress: ${progress}@${speed}`);
+        const formattedSpeed = formatSpeed(speed);
+        const formattedProgress = progress.toFixed(2);
+        process.stdout.write(`\rDownload progress: ${formattedProgress}% @ ${formattedSpeed}\x1b[K`);
+    }).catch((e) => {
+        fs.rm(sessionFolder, { recursive: true, force: true }).catch(() => {}); // cleanup
+        throw e;
     });
 
     let safePath, mainFile;

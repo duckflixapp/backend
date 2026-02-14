@@ -98,4 +98,59 @@ describe('TaskHandler', () => {
             expect(callCount).toBe(0);
         }, 10);
     });
+
+    test('should respect concurrency limit (max 2 active tasks)', async () => {
+        const ch = new TaskHandler({ concurrent: 2 });
+        let activeCount = 0;
+        let maxObservedActive = 0;
+
+        const createTask = () => async () => {
+            activeCount++;
+            maxObservedActive = Math.max(maxObservedActive, activeCount);
+            await new Promise((r) => setTimeout(r, 20));
+            activeCount--;
+        };
+
+        for (let i = 0; i < 5; i++) {
+            ch.handle(createTask());
+        }
+
+        await new Promise((r) => setTimeout(r, 150));
+        expect(maxObservedActive).toBe(2);
+    });
+
+    test('should finish faster tasks first when running in parallel', async () => {
+        const ch = new TaskHandler({ concurrent: 3 });
+        const results: number[] = [];
+
+        const createTask = (val: number, ms: number) => async () => {
+            await new Promise((r) => setTimeout(r, ms));
+            results.push(val);
+        };
+
+        ch.handle(createTask(1, 100));
+        ch.handle(createTask(2, 50));
+        ch.handle(createTask(3, 10));
+
+        await new Promise((r) => setTimeout(r, 150));
+
+        expect(results).toEqual([3, 2, 1]);
+    });
+
+    test('should report correct position for tasks waiting behind workers', async () => {
+        const ch = new TaskHandler({ concurrent: 2 });
+
+        const t1 = ch.handle(async () => await new Promise((r) => setTimeout(r, 100)));
+        const t2 = ch.handle(async () => await new Promise((r) => setTimeout(r, 100)));
+
+        const t3 = ch.handle(async () => {});
+        const t4 = ch.handle(async () => {});
+
+        expect(ch.findPosition(t1)).toBe(0);
+        expect(ch.findPosition(t2)).toBe(0);
+        expect(ch.findPosition(t3)).toBe(1);
+        expect(ch.findPosition(t4)).toBe(2);
+
+        await new Promise((r) => setTimeout(r, 150));
+    });
 });

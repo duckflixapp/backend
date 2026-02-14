@@ -8,10 +8,11 @@ import { eq } from 'drizzle-orm';
 import { VideoProcessingError } from './movies.errors';
 import { TaskHandler } from '../../shared/utils/tasks';
 import { handleMovieTask, handleProcessingError } from './movies.handler';
+import { limits } from '../../shared/configs/limits.config';
 
 export const createMovieStorageKey = (movieId: string, versionId: string, ext: string) => `movies/${movieId}/${versionId}${ext}`;
 
-const taskHandler = new TaskHandler();
+const taskHandler = new TaskHandler({ concurrent: limits.processing.concurrent });
 const taskMovies = new Map<string, string>();
 
 taskHandler.addListener('started', (taskId) => handleMovieTask(taskMovies.get(taskId)!, taskId, 'started'));

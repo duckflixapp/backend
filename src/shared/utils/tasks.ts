@@ -18,16 +18,21 @@ interface Task {
 export class TaskHandler {
     private taskQueue = new Queue<Task>();
     private tasksMap = new Map<string, true>();
-    private current: Task | null = null;
+    private current: Task[] = [];
+    private concurrent: number = 1;
 
     private listeners: { [K in keyof TaskEvents]?: ((...args: TaskEvents[K]) => void)[] } = {};
+
+    constructor(params: { concurrent: number } = { concurrent: 1 }) {
+        this.concurrent = params.concurrent;
+    }
 
     /**
      * Returns the current overall status of the task handler.
      * @returns 'working' if a task is currently being processed, 'waiting' otherwise.
      */
     public get status(): TaskStatus {
-        return this.current != null ? 'working' : 'waiting';
+        return this.current.length !== 0 ? 'working' : 'waiting';
     }
 
     /**
@@ -36,7 +41,9 @@ export class TaskHandler {
      * @returns 'working' if active, 'waiting' if in queue, or undefined if not found.
      */
     public check(taskId: string): TaskStatus | undefined {
-        if (this.current?.id === taskId) return 'working';
+        for (const task of this.current) {
+            if (task.id === taskId) return 'working';
+        }
         return this.tasksMap.has(taskId) ? 'waiting' : undefined;
     }
 
@@ -60,31 +67,33 @@ export class TaskHandler {
      * @returns 0 if currently processing, a positive integer for queue position, or -1 if not found.
      */
     public findPosition(taskId: string) {
-        if (this.current && this.current.id === taskId) return 0;
+        // check if already running
+        for (const task of this.current) {
+            if (task.id === taskId) return 0;
+        }
         const position = this.taskQueue.findPosition((t) => t.id === taskId);
         return position >= 0 ? position + 1 : -1;
     }
 
     private async checkQueue(): Promise<void> {
-        if (this.current) return; // already working
-        if (this.taskQueue.isEmpty) return; // finished - no more tasks
-        await this.process();
+        while (this.current.length < this.concurrent && !this.taskQueue.isEmpty) {
+            await this.process();
+        }
     }
 
     private async process() {
-        this.current = this.taskQueue.remove() as Task;
-        this.tasksMap.delete(this.current.id);
-        const taskId = this.current.id;
-        this.emit('started', taskId);
-        this.current
-            .run()
+        const task = this.taskQueue.remove() as Task;
+        this.current.push(task);
+        this.tasksMap.delete(task.id);
+        this.emit('started', task.id);
+        task.run()
             .then(() => {
-                this.current = null;
-                this.emit('completed', taskId);
+                this.current = [...this.current.filter((t) => t.id !== task.id)];
+                this.emit('completed', task.id);
             })
             .catch((e) => {
-                this.current = null;
-                this.emit('error', taskId, e);
+                this.current = [...this.current.filter((t) => t.id !== task.id)];
+                this.emit('error', task.id, e);
             })
             .finally(() => this.checkQueue());
     }

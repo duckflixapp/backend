@@ -7,6 +7,8 @@ import { catchAsync } from '../../shared/utils/catchAsync';
 import { AppError } from '../../shared/errors';
 import { streamParamsSchema } from './media.validator';
 import { paths } from '../../shared/configs/path.config';
+import { access } from 'node:fs/promises';
+import constants from 'node:constants';
 
 export const stream = catchAsync(async (req: Request, res: Response) => {
     const { versionId } = streamParamsSchema.parse(req.params);
@@ -18,6 +20,10 @@ export const stream = catchAsync(async (req: Request, res: Response) => {
     }
 
     const absolutePath = path.resolve(paths.storage, version.storageKey);
+
+    await access(absolutePath, constants.F_OK).catch(() => {
+        throw new AppError('Video file not found on storage', 404);
+    });
 
     res.sendFile(absolutePath, (err) => {
         if (err) {
