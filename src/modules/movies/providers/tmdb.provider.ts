@@ -1,13 +1,15 @@
 import { AppError } from '../../../shared/errors';
-import { getTmdbMovieDetails } from '../../../shared/lib/tmdb';
+import { TMDBClient } from '../../../shared/lib/tmdb';
 import { getGenreIds } from '../services/genres.service';
 import type { VideoMetadata } from '../services/metadata.service';
 
+const tmdbClient = new TMDBClient({ baseUrl: process.env.TMDB_URL!, apiKey: process.env.TMDB_API_KEY! });
+
 export const fillFromTMDBUrl = async (url: string): Promise<Partial<VideoMetadata>> => {
     const id = parseIdFromUrl(url);
-    if (!id) throw new AppError('Invalid tmdb url', 400);
+    if (!id) throw new AppError('Invalid tmdb url', { statusCode: 400 });
 
-    const raw = await getTmdbMovieDetails(id);
+    const raw = await tmdbClient.getMovieDetails(id);
 
     const rawGenres = raw.genres.map(({ name }) => name.toLowerCase());
     const genreIds = await getGenreIds(rawGenres);

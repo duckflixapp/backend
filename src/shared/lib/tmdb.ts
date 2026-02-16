@@ -2,17 +2,28 @@ import axios from 'axios';
 import type { TMDBMovieDetails } from '../types/tmdb';
 import { AppError } from '../errors';
 
-const tmdb = axios.create({
-    baseURL: 'https://api.themoviedb.org/3',
-    headers: {
-        accept: 'application/json',
-        Authorization: `Bearer ${process.env.TMDB_API_KEY}`,
-    },
-});
+export class TMDBMovieDetailsError extends AppError {
+    constructor(err: unknown) {
+        super('Could not fetch TMDB API', { statusCode: 500, cause: err });
+    }
+}
 
-export const getTmdbMovieDetails = async (id: string) => {
-    const { data } = await tmdb.get<TMDBMovieDetails>(`/movie/${id}`).catch(() => {
-        throw new AppError('Error while fetching TMDB', 500);
-    });
-    return data;
-};
+export class TMDBClient {
+    private readonly api;
+    constructor(options: { baseUrl: string; apiKey: string }) {
+        this.api = axios.create({
+            baseURL: options?.baseUrl,
+            headers: {
+                accept: 'application/json',
+                Authorization: `Bearer ${options.apiKey}`,
+            },
+        });
+    }
+
+    public async getMovieDetails(movieId: string) {
+        const { data } = await this.api.get<TMDBMovieDetails>(`/movie/${movieId}`).catch((err) => {
+            throw new TMDBMovieDetailsError(err);
+        });
+        return data;
+    }
+}

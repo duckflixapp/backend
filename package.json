@@ -34,6 +34,7 @@
         "@duckflix/shared": "file:../shared",
         "argon2": "^0.44.0",
         "axios": "^1.13.5",
+        "concurrently": "^9.2.1",
         "cookie-parser": "^1.4.7",
         "cors": "^2.8.6",
         "drizzle-orm": "^0.45.1",

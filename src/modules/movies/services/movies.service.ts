@@ -12,8 +12,12 @@ import { toMovieDetailedDTO, toMovieDTO } from '../../../shared/mappers/movies.m
 import { getMimeTypeFromFormat } from '../../../shared/utils/ffmpeg';
 import { paths } from '../../../shared/configs/path.config';
 import { AppError } from '../../../shared/errors';
-import { downloadTorrent, formatSpeed, validateTorrentSize } from '../../../shared/utils/torrent';
+import { TorrentClient, validateTorrentFileSize } from '../../../shared/utils/torrent';
 import type { VideoMetadata } from './metadata.service';
+import { RqbitClient } from '../../../shared/lib/rqbit';
+
+const rqbitClient = new RqbitClient({ baseUrl: process.env.RQBIT_URL! });
+const torrentClient = new TorrentClient({ rqbit: rqbitClient });
 
 export const initiateUpload = async (
     data: {
@@ -51,7 +55,7 @@ export const initiateUpload = async (
 export const processTorrentFileWorkflow = async (data: { movieId: string; torrentPath: string }) => {
     let torrentBuffer: Buffer;
     try {
-        const valid = await validateTorrentSize(data.torrentPath);
+        const valid = await validateTorrentFileSize(data.torrentPath);
         if (!valid) throw new AppError('Torrent file is too large', { statusCode: 400 });
 
         torrentBuffer = await fs.readFile(data.torrentPath);
@@ -61,40 +65,49 @@ export const processTorrentFileWorkflow = async (data: { movieId: string; torren
         await fs.unlink(data.torrentPath).catch(() => {});
     }
 
-    const sessionFolder = path.join(paths.downloads, data.movieId);
-    await fs.mkdir(sessionFolder, { recursive: true });
+    await fs.mkdir(paths.downloads, { recursive: true });
 
-    // const torrent =
-    await downloadTorrent(torrentBuffer, sessionFolder, (progress, speed) => {
-        const formattedSpeed = formatSpeed(speed);
-        const formattedProgress = progress.toFixed(2);
-        process.stdout.write(`\rDownload progress: ${formattedProgress}% @ ${formattedSpeed}\x1b[K`);
-    }).catch((e) => {
-        fs.rm(sessionFolder, { recursive: true, force: true }).catch(() => {}); // cleanup
+    const torrent = await torrentClient.download(torrentBuffer).catch((e) => {
+        fs.rm(torrent.dir, { recursive: true, force: true }).catch(() => {});
         throw new TorrentDownloadError(e);
     });
 
-    // let safePath, mainFile;
-    // try {
-    //     mainFile = torrent.files.reduce((p, c) => (p.length > c.length ? p : c));
-    //     const downloadedPath = path.join(torrent.path, mainFile.path);
+    torrent.addListener('progress', ({ percent, speed, eta, peers }) => {
+        console.log(`\rDownload progress: ${percent}% @ ${speed}; ETA: ${eta}; ${peers.active}/${peers.total} ${peers.connecting}`);
+    });
 
-    //     const ext = path.extname(mainFile.name);
-    //     safePath = path.join(paths.downloads, `${data.movieId}-torrent${ext}`);
-    //     await fs.rename(downloadedPath, safePath);
-    // } catch (e) {
-    //     throw new AppError('Video could not be copied after downloading', { cause: e });
-    // } finally {
-    //     torrent.destroy();
-    //     await fs.rm(sessionFolder, { recursive: true, force: true }).catch(() => {});
-    // }
+    torrent.addListener('error', ({ error, code }) => {
+        console.error('Torrent checking stats error:', code, error.name);
+    });
 
-    // await processMovieWorkflow({
-    //     movieId: data.movieId,
-    //     tempPath: safePath,
-    //     originalName: mainFile.name,
-    //     fileSize: mainFile.length,
-    // });
+    try {
+        await torrent.waitDownload();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (err: any) {
+        throw new TorrentDownloadError(err);
+    }
+
+    let safePath, mainFile;
+    try {
+        mainFile = torrent.files.reduce((p, c) => (p.length > c.length ? p : c));
+        const downloadedPath = path.join(torrent.dir, mainFile.name);
+
+        const ext = path.extname(mainFile.name);
+        safePath = path.join(paths.downloads, `${data.movieId}-torrent${ext}`);
+        await fs.rename(downloadedPath, safePath);
+    } catch (e) {
+        throw new AppError('Video could not be copied after downloading', { cause: e });
+    } finally {
+        await fs.rm(torrent.dir, { recursive: true, force: true }).catch(() => {});
+        torrent.destroy().catch(() => {}); // ignore error
+    }
+
+    await processMovieWorkflow({
+        movieId: data.movieId,
+        tempPath: safePath,
+        originalName: mainFile.name,
+        fileSize: mainFile.length,
+    });
 };
 
 export const processMovieWorkflow = async (data: {
