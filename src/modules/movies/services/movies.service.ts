@@ -64,7 +64,8 @@ export const processTorrentFileWorkflow = async (data: { movieId: string; torren
     const sessionFolder = path.join(paths.downloads, data.movieId);
     await fs.mkdir(sessionFolder, { recursive: true });
 
-    const torrent = await downloadTorrent(torrentBuffer, sessionFolder, (progress, speed) => {
+    // const torrent =
+    await downloadTorrent(torrentBuffer, sessionFolder, (progress, speed) => {
         const formattedSpeed = formatSpeed(speed);
         const formattedProgress = progress.toFixed(2);
         process.stdout.write(`\rDownload progress: ${formattedProgress}% @ ${formattedSpeed}\x1b[K`);

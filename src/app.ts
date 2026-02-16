@@ -7,6 +7,8 @@ import helmet from 'helmet';
 
 const app = express();
 
+const proxyCount = parseInt(process.env.PROXIES || '0', 10);
+app.set('trust proxy', proxyCount);
 app.use(
     helmet({
         contentSecurityPolicy: {

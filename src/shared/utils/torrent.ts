@@ -1,5 +1,4 @@
 import fs from 'node:fs/promises';
-import { AppError } from '../errors';
 
 const defaultMaxSize = 1024 * 1024 * 2; // 2MB
 export const validateTorrentSize = async (torrentPath: string, maxSize: number = defaultMaxSize) => {
@@ -16,7 +15,7 @@ export const formatSpeed = (bytesPerSecond: number) => {
     return parseFloat((bytesPerSecond / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
-export const downloadTorrent = (buffer: Buffer, downloadPath: string, onProgress?: (progress: number, speed: number) => void) => {
+export const downloadTorrent = (_buffer: Buffer, _downloadPath: string, _onProgress?: (progress: number, speed: number) => void) => {
     return new Promise((resolve, reject) => {
         try {
             // client.add(buffer, { path: downloadPath }, (torrent) => {
