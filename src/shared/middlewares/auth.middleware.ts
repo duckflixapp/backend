@@ -4,6 +4,8 @@ import { catchAsync } from '../utils/catchAsync';
 import { AppError } from '../errors';
 import { csrfGuard } from './csrf.middleware';
 import { verifyToken } from '../utils/jwt';
+import type { ExtendedError, Socket } from 'socket.io';
+import cookie from 'cookie';
 
 export class UnauthorizedError extends AppError {
     constructor(message: string = 'Unauthorized access') {
@@ -27,3 +29,23 @@ export const authenticate = catchAsync(async (req: Request, res: Response, next:
         throw new UnauthorizedError('Invalid token');
     }
 });
+
+export const authenticateSocket = async (socket: Socket, next: (err?: ExtendedError | undefined) => unknown) => {
+    try {
+        const rawCookies = socket.handshake.headers.cookie;
+        if (!rawCookies) return next(new Error('Auth error: No cookies'));
+
+        const cookies = cookie.parse(rawCookies);
+        const token = cookies['auth_token'];
+        if (!token) return next(new Error('Auth error: Token missing'));
+
+        const decoded = verifyToken(token) as { userId: string };
+        if (!decoded?.userId) return next(new Error('Auth error: Invalid user'));
+
+        socket.data.userId = decoded.userId;
+        next();
+    } catch (err) {
+        next(new Error('Authentication error'));
+        console.error('socket auth error', err);
+    }
+};

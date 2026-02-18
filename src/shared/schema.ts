@@ -23,7 +23,7 @@ export const movies = pgTable(
         rating: decimal('rating', { precision: 3, scale: 1 }).default('0.0'),
         releaseYear: integer('release_year'),
         duration: integer('duration'), // null while uploading or similar - seconds
-        status: text('status').$type<'processing' | 'ready' | 'error'>().default('processing').notNull(),
+        status: text('status').$type<'downloading' | 'processing' | 'ready' | 'error'>().default('processing').notNull(),
         userId: uuid('user_id')
             .notNull()
             .references(() => users.id, { onDelete: 'cascade' }),

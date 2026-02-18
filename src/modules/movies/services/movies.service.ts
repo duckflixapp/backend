@@ -7,7 +7,7 @@ import { InvalidVideoFileError, MovieNotCreatedError, MovieNotFoundError, Torren
 import { randomUUID } from 'node:crypto';
 import { ffprobe } from '../../../shared/utils/videoProcessor';
 import { createMovieStorageKey, startProcessing } from '../movies.processor';
-import type { MovieDetailedDTO, MovieDTO, PaginatedResponse } from '@duckflix/shared';
+import type { DownloadProgress, MovieDetailedDTO, MovieDTO, PaginatedResponse } from '@duckflix/shared';
 import { toMovieDetailedDTO, toMovieDTO } from '../../../shared/mappers/movies.mapper';
 import { getMimeTypeFromFormat } from '../../../shared/utils/ffmpeg';
 import { paths } from '../../../shared/configs/path.config';
@@ -15,6 +15,8 @@ import { AppError } from '../../../shared/errors';
 import { TorrentClient, validateTorrentFileSize } from '../../../shared/utils/torrent';
 import type { VideoMetadata } from './metadata.service';
 import { RqbitClient } from '../../../shared/lib/rqbit';
+import { emitMovieProgress } from '../movies.handler';
+import { notifyJobStatus } from '../../../shared/services/notification.service';
 
 const rqbitClient = new RqbitClient({ baseUrl: process.env.RQBIT_URL! });
 const torrentClient = new TorrentClient({ rqbit: rqbitClient });
@@ -22,6 +24,7 @@ const torrentClient = new TorrentClient({ rqbit: rqbitClient });
 export const initiateUpload = async (
     data: {
         userId: string;
+        status: 'downloading' | 'processing';
     } & VideoMetadata
 ): Promise<MovieDTO> => {
     const [dbMovie] = await db
@@ -34,7 +37,7 @@ export const initiateUpload = async (
             rating: null,
             releaseYear: data.releaseYear,
             duration: null,
-            status: 'processing',
+            status: data.status,
             userId: data.userId,
         })
         .returning();
@@ -52,7 +55,7 @@ export const initiateUpload = async (
     });
 };
 
-export const processTorrentFileWorkflow = async (data: { movieId: string; torrentPath: string }) => {
+export const processTorrentFileWorkflow = async (data: { userId: string; movieId: string; torrentPath: string }) => {
     let torrentBuffer: Buffer;
     try {
         const valid = await validateTorrentFileSize(data.torrentPath);
@@ -71,9 +74,7 @@ export const processTorrentFileWorkflow = async (data: { movieId: string; torren
         throw new TorrentDownloadError(e);
     });
 
-    torrent.addListener('progress', ({ percent, speed, eta, peers }) => {
-        console.log(`\rDownload progress: ${percent}% @ ${speed}; ETA: ${eta}; ${peers.active}/${peers.total} ${peers.connecting}`);
-    });
+    torrent.addListener('progress', (progress) => emitMovieProgress(data.movieId, 'downloading', progress as DownloadProgress));
 
     torrent.addListener('error', ({ error, code }) => {
         console.error('Torrent checking stats error:', code, error.name);
@@ -85,6 +86,17 @@ export const processTorrentFileWorkflow = async (data: { movieId: string; torren
     } catch (err: any) {
         fs.rm(torrent.dir, { recursive: true, force: true }).catch(() => {});
         throw new TorrentDownloadError(err);
+    }
+
+    try {
+        await db.update(movies).set({ status: 'processing' }).where(eq(movies.id, data.movieId));
+        notifyJobStatus(data.userId, 'downloaded', `Movie downloaded`, `Movie download completed. Processing...`, data.movieId).catch(
+            () => {}
+        );
+    } catch (e) {
+        await fs.rm(torrent.dir, { recursive: true, force: true }).catch(() => {});
+        torrent.destroy().catch(() => {});
+        throw new AppError('Error changing video status and notifying', { cause: e });
     }
 
     let safePath, mainFile;
@@ -103,6 +115,7 @@ export const processTorrentFileWorkflow = async (data: { movieId: string; torren
     }
 
     await processMovieWorkflow({
+        userId: data.userId,
         movieId: data.movieId,
         tempPath: safePath,
         originalName: mainFile.name,
@@ -111,6 +124,7 @@ export const processTorrentFileWorkflow = async (data: { movieId: string; torren
 };
 
 export const processMovieWorkflow = async (data: {
+    userId: string;
     movieId: string;
     tempPath: string;
     originalName: string;
@@ -165,6 +179,7 @@ export const processMovieWorkflow = async (data: {
             });
             await tx.update(movies).set({ duration, status: 'ready' }).where(eq(movies.id, data.movieId));
         });
+        notifyJobStatus(data.userId, 'completed', `Movie upload completed`, `Movie uploaded successfully`, data.movieId).catch(() => {});
     } catch (e) {
         await fs.unlink(finalPath).catch(() => {});
         throw new AppError('Video could not be saved in database', { cause: e });

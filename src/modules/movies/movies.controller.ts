@@ -18,10 +18,15 @@ export const upload = catchAsync(async (req: Request, res: Response) => {
 
     const metadata = await MetadataService.enrichMetadata(validatedData.dbUrl, validatedData);
 
-    const movie = await MoviesService.initiateUpload({ userId: req.userId!, ...metadata });
+    const movie = await MoviesService.initiateUpload({
+        userId: req.userId!,
+        status: videoFile ? 'processing' : 'downloading',
+        ...metadata,
+    });
 
     if (videoFile)
         MoviesService.processMovieWorkflow({
+            userId: req.userId!,
             movieId: movie.id,
             tempPath: videoFile.path,
             originalName: videoFile.originalname,
@@ -29,6 +34,7 @@ export const upload = catchAsync(async (req: Request, res: Response) => {
         }).catch((e) => handleWorkflowError(movie.id, e, 'movie'));
     else if (torrentFile?.path) {
         MoviesService.processTorrentFileWorkflow({
+            userId: req.userId!,
             movieId: movie.id,
             torrentPath: torrentFile?.path,
         }).catch((e) => handleWorkflowError(movie.id, e, 'torrent'));

@@ -1,9 +1,16 @@
+import http from 'node:http';
 import { app } from './app';
 import { pool } from './shared/db';
+import { SocketServer } from './shared/lib/socket';
 
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT!;
 
-const server = app.listen(PORT, () => {
+const httpServer = http.createServer(app);
+const socketServer = new SocketServer(httpServer);
+
+export const io = socketServer.init();
+
+const server = httpServer.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
 });
 

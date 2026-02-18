@@ -2,18 +2,19 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 import { db } from '../../shared/db';
 import { movieVersions, type MovieVersion, type NewMovieVersion } from '../../shared/schema';
-import { copy, ffprobe, transcode } from '../../shared/utils/videoProcessor';
+import { ffprobe, VideoJob, type JobType } from '../../shared/utils/videoProcessor';
 import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { VideoProcessingError } from './movies.errors';
 import { TaskHandler } from '../../shared/utils/tasks';
-import { handleMovieTask, handleProcessingError } from './movies.handler';
+import { emitMovieProgress, handleMovieTask, handleProcessingError } from './movies.handler';
 import { limits } from '../../shared/configs/limits.config';
 
 export const createMovieStorageKey = (movieId: string, versionId: string, ext: string) => `movies/${movieId}/${versionId}${ext}`;
 
 const taskHandler = new TaskHandler({ concurrent: limits.processing.concurrent });
 const taskMovies = new Map<string, string>();
+const jobs = new Map<string, VideoJob>();
 
 taskHandler.addListener('started', (taskId) => handleMovieTask(taskMovies.get(taskId)!, taskId, 'started'));
 taskHandler.addListener('completed', (taskId) => handleMovieTask(taskMovies.get(taskId)!, taskId, 'completed'));
@@ -66,8 +67,23 @@ const processTask = async (task: MovieVersion, originalPath: string, outputPath:
         const isSameHeight = videoStream?.height === task.height;
 
         // process
-        if (isSameHeight && (codecName === 'h264' || codecName === 'h265' || codecName === 'hevc')) await copy(originalPath, outputPath);
-        else await transcode(originalPath, outputPath, task.height);
+        const isHvec = codecName === 'h265' || codecName === 'hevc';
+        const totalDuration = parseFloat(originalMeta.format.duration) || 0;
+
+        const type: JobType = isSameHeight && (codecName === 'h264' || isHvec) ? 'copy' : 'transcode';
+        const job = new VideoJob(originalPath, outputPath, type, {
+            height: task.height,
+            isHvec,
+            priority: 1,
+            totalDuration,
+        });
+        jobs.set(task.id, job);
+        job.addListener('progress', (progress) => emitMovieProgress(task.movieId, 'processing', progress, task.id));
+
+        await job.start();
+        jobs.delete(task.id);
+        job.destroy();
+
         const stats = await fs.stat(outputPath);
 
         // additional check for actual resolution

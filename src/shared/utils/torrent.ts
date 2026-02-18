@@ -5,6 +5,7 @@ import type { RqbitClient } from '../lib/rqbit';
 import { AppError } from '../errors';
 import path from 'node:path';
 import { paths } from '../configs/path.config';
+import type { DownloadProgress } from '@duckflix/shared';
 
 const defaultMaxSize = 1024 * 1024 * 2; // 2MB
 export const validateTorrentFileSize = async (torrentPath: string, maxSize: number = defaultMaxSize) => {
@@ -50,7 +51,7 @@ export class Torrent extends EventEmitter {
         const peers = stats.live?.snapshot.peer_stats;
 
         this.emit('progress', {
-            percent: (progress * 100).toFixed(2),
+            percent: Number((progress * 100).toFixed(2)),
             speed: stats.live?.download_speed.human_readable ?? '0 B/s',
             eta: stats.live?.time_remaining?.human_readable ?? 'N/A',
             peers: {
@@ -58,7 +59,7 @@ export class Torrent extends EventEmitter {
                 total: peers?.seen ?? 0,
                 connecting: peers?.connecting ?? 0,
             },
-        });
+        } as DownloadProgress);
 
         return { stats, progress };
     }

@@ -1,8 +1,11 @@
 import { eq } from 'drizzle-orm';
 import { db } from '../../shared/db';
-import { movies, movieVersions, notifications } from '../../shared/schema';
+import { movies, movieVersions } from '../../shared/schema';
 import { AppError } from '../../shared/errors';
 import { capitalize } from '../../shared/utils/string';
+import { io } from '../../server';
+import type { DownloadProgress, JobProgress } from '@duckflix/shared';
+import { notifyJobStatus } from '../../shared/services/notification.service';
 
 export const handleWorkflowError = async (movieId: string, error: unknown, context: 'movie' | 'torrent') => {
     try {
@@ -18,9 +21,7 @@ export const handleWorkflowError = async (movieId: string, error: unknown, conte
             let message = 'Unexpected error.';
             if (error instanceof AppError) message = error.message;
 
-            db.insert(notifications)
-                .values({ userId, movieId, type: 'error', title, message })
-                .catch((e) => console.error('[NOTIF_FAIL]', e));
+            notifyJobStatus(userId, 'error', title, message, movieId);
         }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
@@ -50,16 +51,8 @@ export const handleProcessingError = async (movieVerId: string, error: unknown, 
                     message = error.message;
                 }
 
-                db.insert(notifications)
-                    .values({
-                        userId: movieData.userId,
-                        movieId: updatedVersion.movieId,
-                        movieVerId: movieVerId,
-                        type: 'error',
-                        title,
-                        message,
-                    })
-                    .catch((err) => console.error('[NOTIF_FAIL]', err));
+                if (updatedVersion?.movieId)
+                    notifyJobStatus(movieData?.userId, 'error', title, message, updatedVersion.movieId, movieVerId);
             }
         }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -86,21 +79,12 @@ export const handleMovieTask = async (movieVerId: string, taskId: string, contex
                 .from(movies)
                 .where(eq(movies.id, updatedVersion.movieId));
 
-            if (movieData?.userId) {
-                const title = `Task ${context}`;
-                let message = `${capitalize(context)} processing task for: ${movieData.title}`;
+            if (!movieData?.userId) return;
 
-                db.insert(notifications)
-                    .values({
-                        userId: movieData.userId,
-                        movieId: updatedVersion.movieId,
-                        movieVerId: movieVerId,
-                        type: context === 'completed' ? 'success' : 'info',
-                        title,
-                        message,
-                    })
-                    .catch((err) => console.error('[NOTIF_FAIL]', err));
-            }
+            const title = `Task ${context}`;
+            let message = `${capitalize(context)} processing task for: ${movieData.title}`;
+
+            if (updatedVersion?.movieId) notifyJobStatus(movieData?.userId, context, title, message, updatedVersion.movieId, movieVerId);
         }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
@@ -110,4 +94,17 @@ export const handleMovieTask = async (movieVerId: string, taskId: string, contex
         });
     }
     console.log(`[MovieTask] ${context} processing task: ${taskId}, movie ver. ${movieVerId}`);
+};
+
+export const emitMovieProgress = (
+    movieId: string,
+    status: 'downloading' | 'processing' | 'error',
+    progress?: JobProgress | DownloadProgress,
+    versionId?: string
+) => {
+    io.to(`movie:${movieId}`).emit('video:progress', {
+        status,
+        versionId,
+        progress,
+    });
 };
