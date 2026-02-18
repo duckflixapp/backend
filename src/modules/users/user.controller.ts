@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import * as UserService from './user.service';
 import { catchAsync } from '../../shared/utils/catchAsync';
+import { validateMarkUserNotifications } from './user.validator';
 
 export const getMe = catchAsync(async (req: Request, res: Response) => {
     if (!req.userId) {
@@ -21,5 +22,26 @@ export const getUserNotifications = catchAsync(async (req: Request, res: Respons
     res.status(201).json({
         status: 'success',
         data: { notifications },
+    });
+});
+
+export const markUserNotifications = catchAsync(async (req: Request, res: Response) => {
+    const { notificationIds } = validateMarkUserNotifications.parse(req.body);
+
+    await UserService.markUserNotifications(req.userId!, {
+        markAll: notificationIds.length === 0,
+        notificationIds,
+    });
+
+    res.status(201).json({
+        status: 'success',
+    });
+});
+
+export const clearUserNotifications = catchAsync(async (req: Request, res: Response) => {
+    await UserService.clearUserNotifications(req.userId!);
+
+    res.status(201).json({
+        status: 'success',
     });
 });
