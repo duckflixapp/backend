@@ -14,6 +14,12 @@ systemSettings.addListener('update', (settings: SystemSettingsT) => {
     console.log('TMDB API Key updated.');
 });
 
+const parseIdFromUrl = (url: string): string | null => {
+    const movieMatch = url.match(/themoviedb\.org\/movie\/(\d+)/);
+    if (movieMatch) return movieMatch[1] ?? null;
+    return null;
+};
+
 export const fillFromTMDBUrl = async (url: string): Promise<Partial<VideoMetadata>> => {
     const id = parseIdFromUrl(url);
     if (!id) throw new AppError('Invalid tmdb url', { statusCode: 400 });
@@ -35,8 +41,8 @@ export const fillFromTMDBUrl = async (url: string): Promise<Partial<VideoMetadat
     };
 };
 
-const parseIdFromUrl = (url: string): string | null => {
-    const movieMatch = url.match(/themoviedb\.org\/movie\/(\d+)/);
-    if (movieMatch) return movieMatch[1] ?? null;
-    return null;
+export const getTMDBGenres = async () => {
+    const { genres } = await tmdbClient.getMovieGenres();
+    const genreNames = genres.map(({ name }) => name.toLowerCase());
+    return genreNames;
 };

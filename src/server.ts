@@ -3,14 +3,16 @@ import { app } from './app';
 import { pool } from './shared/configs/db';
 import { SocketServer } from './shared/lib/socket';
 import { env } from './env';
+import { initalize } from './initialize';
 
 const PORT = env.PORT;
 
 const httpServer = http.createServer(app);
 const socketServer = new SocketServer(httpServer);
 
-export const io = socketServer.init();
+await initalize();
 
+export const io = socketServer.init();
 const server = httpServer.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
 });

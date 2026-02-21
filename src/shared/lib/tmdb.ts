@@ -4,7 +4,13 @@ import { AppError } from '../errors';
 
 export class TMDBMovieDetailsError extends AppError {
     constructor(err: unknown) {
-        super('Could not fetch TMDB API', { statusCode: 500, cause: err });
+        super('Could not fetch TMDB Movies API', { statusCode: 500, cause: err });
+    }
+}
+
+export class TMDBGenresError extends AppError {
+    constructor(err: unknown) {
+        super('Could not fetch TMDB Genres API', { statusCode: 500, cause: err });
     }
 }
 
@@ -33,6 +39,15 @@ export class TMDBClient {
         const { data } = await this.api.get<TMDBMovieDetails>(`/movie/${movieId}`).catch((err) => {
             throw new TMDBMovieDetailsError(err);
         });
+        return data;
+    }
+
+    public async getMovieGenres(options?: { language?: string }) {
+        const { data } = await this.api
+            .get<{ genres: { id: number; name: string }[] }>('/genre/movie/list', { params: { language: options?.language } })
+            .catch((err) => {
+                throw new TMDBGenresError(err);
+            });
         return data;
     }
 }

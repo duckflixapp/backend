@@ -3,7 +3,8 @@ import authRouter from '../modules/auth/auth.router';
 import movieRouter from '../modules/movies/movies.router';
 import usersRouter from '../modules/users/user.router';
 import mediaRouter from '../modules/media/media.router';
-import { authenticate } from '../shared/middlewares/auth.middleware';
+import adminRouter from '../modules/admin/admin.router';
+import { authenticate, hasRole } from '../shared/middlewares/auth.middleware';
 
 const router = Router();
 
@@ -12,5 +13,7 @@ router.use('/users', usersRouter);
 
 router.use('/movies', authenticate(), movieRouter);
 router.use('/media', authenticate(), mediaRouter);
+
+router.use('/admin', authenticate(), hasRole('admin'), adminRouter);
 
 export default router;

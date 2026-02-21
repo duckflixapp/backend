@@ -52,12 +52,14 @@ export class SystemSettings extends EventEmitter {
         return merge(DEFAULT_SETTINGS, result.settings, { arrayMerge: overwriteMerge });
     }
 
-    public async update(settings: Partial<SystemSettingsT>) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    public async update(settings: any) {
         const current = await this.get();
 
         const data = await this.save(merge(current, settings, { arrayMerge: overwriteMerge }));
 
         this.emit('update', data);
+        return data;
     }
 
     private async save(settings: SystemSettingsT): Promise<SystemSettingsT> {

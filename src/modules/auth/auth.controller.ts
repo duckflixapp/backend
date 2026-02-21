@@ -36,7 +36,7 @@ export const login = catchAsync(async (req: Request, res: Response) => {
         httpOnly: true,
         secure: env.NODE_ENV === 'production',
         maxAge: limits.authentication.session_expiry_ms,
-        sameSite: 'strict',
+        sameSite: 'lax',
         path: `${env.BASE_URL}/auth/refresh`,
     });
     res.cookie('auth_token', result.token, {
