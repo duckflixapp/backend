@@ -28,6 +28,8 @@ export const register = async (name: string, email: string, pass: string): Promi
     const verificationToken = crypto.randomBytes(32).toString('hex');
 
     const user = await db.transaction(async (tx) => {
+        const existingUser = await tx.select({ id: users.id }).from(users).limit(1);
+
         const [user] = await tx
             .insert(users)
             .values({
@@ -35,6 +37,7 @@ export const register = async (name: string, email: string, pass: string): Promi
                 email,
                 password: hashedPassword,
                 verified_email: trustEmails,
+                role: existingUser.length === 0 ? 'admin' : 'watcher',
             })
             .returning()
             .catch((e) => {
