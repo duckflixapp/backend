@@ -20,6 +20,7 @@ import { notifyJobStatus } from '../../../shared/services/notification.service';
 import { computeHash, downloadSubtitles } from './subs.service';
 import { env } from '../../../env';
 import { systemSettings } from '../../../shared/services/system.service';
+import { logger } from '../../../shared/utils/logger';
 
 const rqbitClient = new RqbitClient({ baseUrl: env.RQBIT_URL! });
 const torrentClient = new TorrentClient({ rqbit: rqbitClient });
@@ -85,11 +86,21 @@ export const processTorrentFileWorkflow = async (data: { userId: string; movieId
     torrent.addListener('progress', (progress) => emitMovieProgress(data.movieId, 'downloading', progress as DownloadProgress));
 
     torrent.addListener('error', ({ error, code }) => {
-        console.error('Torrent checking stats error:', code, error.name);
+        logger.debug(
+            {
+                err: error,
+                errorCode: code,
+                movieId: data.movieId,
+                context: 'torrent_client',
+            },
+            'Torrent download status error'
+        );
     });
 
     try {
+        logger.info({ movieId: data.movieId }, 'Torrent waiting for download...');
         await torrent.waitDownload();
+        logger.info({ movieId: data.movieId }, 'Torrent download finished...');
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
         fs.rm(torrent.dir, { recursive: true, force: true }).catch(() => {});
@@ -199,7 +210,15 @@ export const processMovieWorkflow = async (data: {
     if (data.imdbId) {
         const movieHash = await computeHash(finalPath);
         downloadSubtitles({ movieId: data.movieId, imdbId: data.imdbId, movieHash }).catch((err) => {
-            console.error('Error downloading subs', err);
+            logger.error(
+                {
+                    err,
+                    movieId: data.movieId,
+                    imdbId: data.imdbId,
+                    context: 'subtitles_service',
+                },
+                'Failed to download subtitles in background'
+            );
         });
     }
 

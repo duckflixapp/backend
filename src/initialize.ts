@@ -3,12 +3,15 @@ import { getTMDBGenres } from './modules/movies/providers/tmdb.provider';
 import { db } from './shared/configs/db';
 import { genres } from './shared/schema';
 import { systemSettings } from './shared/services/system.service';
+import { logger } from './shared/utils/logger';
 
 export const initalize = async () => {
     await systemSettings.update({}); // update with default settings
 
     const [totalGenres] = await db.select({ value: count(genres.id) }).from(genres);
     if (totalGenres?.value === 0) await seedGenres();
+
+    logger.info('System initialized successfully.');
 };
 
 const seedGenres = async () => {

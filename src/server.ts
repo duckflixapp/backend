@@ -4,6 +4,7 @@ import { pool } from './shared/configs/db';
 import { SocketServer } from './shared/lib/socket';
 import { env } from './env';
 import { initalize } from './initialize';
+import { logger } from './shared/utils/logger';
 
 const PORT = env.PORT;
 
@@ -14,7 +15,7 @@ await initalize();
 
 export const io = socketServer.init();
 const server = httpServer.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT}`);
+    logger.info(`Server is running on http://localhost:${PORT}`);
 });
 
 process.on('SIGINT', async () => {

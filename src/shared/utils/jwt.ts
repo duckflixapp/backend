@@ -4,13 +4,22 @@ import type { UserRole } from '@duckflix/shared';
 import { limits } from '../configs/limits.config';
 import path from 'node:path';
 import fs from 'node:fs';
+import { logger } from './logger';
 
 const CERTS_DIR = path.resolve('../../certs');
 const PRIVATE_KEY_PATH = path.join(CERTS_DIR, 'private.pem');
 const PUBLIC_KEY_PATH = path.join(CERTS_DIR, 'public.pem');
 
 if (!fs.existsSync(PRIVATE_KEY_PATH) || !fs.existsSync(PUBLIC_KEY_PATH)) {
-    console.error(`JWT Keys missing!\nExpected at: ${CERTS_DIR}\n` + `Please run key generation script or check Docker volumes.`);
+    logger.fatal(
+        {
+            certsDir: CERTS_DIR,
+            privateKeyExists: fs.existsSync(PRIVATE_KEY_PATH),
+            publicKeyExists: fs.existsSync(PUBLIC_KEY_PATH),
+        },
+        'JWT_KEYS_MISSING'
+    );
+
     process.exit(1);
 }
 

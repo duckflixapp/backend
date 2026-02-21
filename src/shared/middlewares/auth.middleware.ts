@@ -59,17 +59,16 @@ export const authenticate = (verified: boolean = true) => {
 export const authenticateSocket = async (socket: Socket, next: (err?: ExtendedError | undefined) => unknown) => {
     try {
         const rawCookies = socket.handshake.headers.cookie;
-        if (!rawCookies) return next(new Error('Auth error: No cookies'));
+        if (!rawCookies) return next(new UnauthorizedError('Auth error: No cookies'));
 
         const cookies = cookie.parse(rawCookies);
         const token = cookies['auth_token'];
-        if (!token) return next(new Error('Auth error: Token missing'));
+        if (!token) return next(new UnauthorizedError('Auth error: Token missing'));
 
         const decoded = verifyToken(token);
         socket.data.userId = decoded.sub;
         next();
-    } catch (err) {
-        next(new Error('Authentication error'));
-        console.error('socket auth error', err);
+    } catch {
+        next(new UnauthorizedError('Authentication error'));
     }
 };

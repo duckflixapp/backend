@@ -1,6 +1,7 @@
 import { db } from '../configs/db';
 import { notifications } from '../schema';
 import { io } from '../../server';
+import { logger } from '../utils/logger';
 
 const notifyUser = (userId: string, data: unknown) => {
     io.to(`user:${userId}`).emit('notification', data);
@@ -32,7 +33,7 @@ const notifyJobStatus = async (
             title,
             message,
         })
-        .catch((err) => console.error('[NOTIF_FAIL]', err));
+        .catch((err) => logger.error({ err, userId, movieId, status }, 'Failed to save notification to database'));
     notifyUser(userId, { movieId, movieVerId, status, title, message });
 };
 

@@ -6,6 +6,7 @@ import { capitalize } from '../../shared/utils/string';
 import { io } from '../../server';
 import type { DownloadProgress, JobProgress } from '@duckflix/shared';
 import { notifyJobStatus } from '../../shared/services/notification.service';
+import { logger } from '../../shared/utils/logger';
 
 export const handleWorkflowError = async (movieId: string, error: unknown, context: 'movie' | 'torrent') => {
     try {
@@ -23,15 +24,18 @@ export const handleWorkflowError = async (movieId: string, error: unknown, conte
 
             notifyJobStatus(userId, 'error', title, message, movieId);
         }
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
-        console.error(`[CRITICAL_DB_ERROR] Failed during processing workflow error update:`, {
-            code: err.code,
-            message: err.message,
-        });
+    } catch (err: unknown) {
+        logger.fatal({ err, movieId, context }, 'CRITICAL: Failed to mark movie status as error in DB');
     }
-    // handle better logging
-    console.error(`[${context}] Error for movie ${movieId}:`, error);
+    logger.error(
+        {
+            err: error,
+            movieId,
+            context,
+            workflowStep: 'handleWorkflowError',
+        },
+        `Workflow error in ${context}`
+    );
 };
 
 export const handleProcessingError = async (movieVerId: string, error: unknown, context: 'transcode' | 'task') => {
@@ -55,15 +59,18 @@ export const handleProcessingError = async (movieVerId: string, error: unknown, 
                     notifyJobStatus(movieData?.userId, 'error', title, message, updatedVersion.movieId, movieVerId);
             }
         }
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
-        console.error(`[CRITICAL_DB_ERROR] Failed during processing error update:`, {
-            code: err.code,
-            message: err.message,
-        });
+    } catch (err: unknown) {
+        logger.fatal({ err, movieVerId, context }, 'CRITICAL: Failed to update movie version status to error');
     }
-    // handle better logging
-    console.error(`[${context}] Error for movie version ${movieVerId}:`, error);
+    logger.error(
+        {
+            err: error,
+            movieVerId,
+            context,
+            workflowStep: 'handleProcessingError',
+        },
+        `Processing failed during ${context}`
+    );
 };
 
 export const handleMovieTask = async (movieVerId: string, taskId: string, context: 'started' | 'completed') => {
@@ -86,14 +93,11 @@ export const handleMovieTask = async (movieVerId: string, taskId: string, contex
 
             if (updatedVersion?.movieId) notifyJobStatus(movieData?.userId, context, title, message, updatedVersion.movieId, movieVerId);
         }
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
-        console.error(`[DB_ERROR] Failed during processing movie notification:`, {
-            code: err.code,
-            message: err.message,
-        });
+        logger.info({ movieVerId, taskId, context }, `Movie task ${context}`);
+    } catch (err: unknown) {
+        logger.error({ err, movieVerId, taskId }, 'Failed to send movie task notification');
     }
-    console.log(`[MovieTask] ${context} processing task: ${taskId}, movie ver. ${movieVerId}`);
+    logger.debug({ taskId, movieVerId }, `[MovieTask] processing task ${context}`);
 };
 
 export const emitMovieProgress = (

@@ -8,4 +8,5 @@ export const paths = {
     storage: path.resolve(ROOT_STORAGE),
     downloads: path.resolve(ROOT_TEMP, 'downloads/'),
     uploads: path.resolve(ROOT_TEMP, 'uploads/'),
+    logs: path.resolve(env.LOG_FOLDER),
 } as const;

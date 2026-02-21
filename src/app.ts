@@ -5,10 +5,13 @@ import { globalErrorHandler } from './shared/errors';
 import router from './routes/v1';
 import helmet from 'helmet';
 import { env } from './env';
+import { httpLogger } from './shared/utils/logger';
 
 const app = express();
 
 app.set('trust proxy', env.PROXIES);
+app.use(httpLogger);
+
 app.use(
     helmet({
         contentSecurityPolicy: {

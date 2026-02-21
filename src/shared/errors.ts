@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 import { ZodError } from 'zod';
+import { logger } from './utils/logger';
 
 export class AppError extends Error {
     public readonly originalError?: unknown;
@@ -37,6 +38,16 @@ export const globalErrorHandler = (err: unknown, req: Request, res: Response, _n
             message: err.message,
         });
     }
-    console.error('ERROR:', err);
+    logger.error(
+        {
+            path: req.path,
+            method: req.method,
+            user: req.user,
+            ip: req.ip,
+            userAgent: req.get('user-agent'),
+            err,
+        },
+        `Unexpected Server Error`
+    );
     return res.status(500).json({ error: 'Internal server error' });
 };

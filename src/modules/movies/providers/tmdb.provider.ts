@@ -5,13 +5,14 @@ import type { VideoMetadata } from '../services/metadata.service';
 import { env } from '../../../env';
 import { systemSettings } from '../../../shared/services/system.service';
 import type { SystemSettingsT } from '../../../shared/schema';
+import { logger } from '../../../shared/utils/logger';
 
 const sysSettings = await systemSettings.get();
 const tmdbClient = new TMDBClient({ baseUrl: env.TMDB_URL, apiKey: sysSettings.external.tmdb.apiKey });
 systemSettings.addListener('update', (settings: SystemSettingsT) => {
     const updated = tmdbClient.updateCredentials(settings.external.tmdb.apiKey);
     if (!updated) return;
-    console.log('TMDB API Key updated.');
+    logger.info({ context: 'external_api', service: 'tmdb' }, 'TMDB API Key updated successfully without restart');
 });
 
 const parseIdFromUrl = (url: string): string | null => {

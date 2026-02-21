@@ -12,6 +12,7 @@ import { SubtitleDownloadError } from '../movies.errors';
 import { AppError } from '../../../shared/errors';
 import { env } from '../../../env';
 import { systemSettings } from '../../../shared/services/system.service';
+import { logger } from '../../../shared/utils/logger';
 
 const sysSettings = await systemSettings.get();
 const subtitlesClient = new OpenSubtitlesClient({
@@ -26,7 +27,7 @@ systemSettings.addListener('update', (settings: SystemSettingsT) => {
     const openSubtitles = settings.external.openSubtitles;
     if (!subtitlesClient.updateCredentials(openSubtitles.apiKey, openSubtitles.username, openSubtitles.password, openSubtitles.useLogin))
         return;
-    console.log('OpenSubtitles API Credentials updated.');
+    logger.info({ context: 'external_api', service: 'opensubtitles' }, 'OpenSubtitles credentials updated successfully');
 });
 
 export const downloadSubtitles = async (data: { movieId: string; imdbId: string; movieHash?: string }) => {
@@ -85,9 +86,24 @@ export const downloadSubtitles = async (data: { movieId: string; imdbId: string;
                     await fs.unlink(finalPath).catch(() => {});
                     throw new AppError('Database insert failed for subtitle', { cause: err });
                 });
+
+            logger.info(
+                {
+                    movieId: data.movieId,
+                    language: subtitle.language,
+                    storageKey,
+                },
+                'Subtitle processed and saved successfully'
+            );
         } catch (err) {
-            if (err instanceof AppError) console.error(`[Subtitle Skip] ${err.message}`);
-            else console.error('Critical Error processing subtitle:', err);
+            const log = {
+                err,
+                movieId: data.movieId,
+                language: subtitle.language,
+                externalId: subtitle.id,
+            };
+            if (err instanceof AppError) logger.warn(log, `[Subtitle Skip] ${err.message}`);
+            else logger.error(log, 'Critical Error processing subtitle');
         }
     }
 };

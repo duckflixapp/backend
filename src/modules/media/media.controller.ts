@@ -9,6 +9,7 @@ import { streamParamsSchema, subtitleParamsSchema } from './media.validator';
 import { paths } from '../../shared/configs/path.config';
 import { access } from 'node:fs/promises';
 import constants from 'node:constants';
+import { logger } from '../../shared/utils/logger';
 
 export const stream = catchAsync(async (req: Request, res: Response) => {
     const { versionId } = streamParamsSchema.parse(req.params);
@@ -29,10 +30,20 @@ export const stream = catchAsync(async (req: Request, res: Response) => {
         if (err) {
             const errCode = (err as { code?: string }).code;
             const isClientAbort = errCode === 'ECONNABORTED' || errCode === 'ECANCELED' || err.message.toLowerCase().includes('aborted');
-            if (isClientAbort) return; // client error
+            if (isClientAbort) {
+                logger.debug({ path: absolutePath }, 'Stream aborted by client');
+                return; // client error
+            }
             if (res.headersSent) return;
 
-            console.error('Streaming error:', err);
+            logger.error(
+                {
+                    err,
+                    code: errCode,
+                    path: absolutePath,
+                },
+                'Failed to send file'
+            );
         }
     });
 });
@@ -56,10 +67,20 @@ export const subtitle = catchAsync(async (req: Request, res: Response) => {
         if (err) {
             const errCode = (err as { code?: string }).code;
             const isClientAbort = errCode === 'ECONNABORTED' || errCode === 'ECANCELED' || err.message.toLowerCase().includes('aborted');
-            if (isClientAbort) return; // client error
+            if (isClientAbort) {
+                logger.debug({ path: absolutePath }, 'Subtitle aborted by client');
+                return; // client error
+            }
             if (res.headersSent) return;
 
-            console.error('Subtitle error:', err);
+            logger.error(
+                {
+                    err,
+                    code: errCode,
+                    path: absolutePath,
+                },
+                'Failed to send subtitle'
+            );
         }
     });
 });

@@ -13,6 +13,7 @@ import { ForbiddenError } from '../../shared/middlewares/auth.middleware';
 import { limits } from '../../shared/configs/limits.config';
 import { sendVerificationMail } from '../../shared/services/mailer.service';
 import { systemSettings } from '../../shared/services/system.service';
+import { logger } from '../../shared/utils/logger';
 
 export const register = async (name: string, email: string, pass: string): Promise<UserDTO> => {
     const sysSettings = await systemSettings.get();
@@ -55,7 +56,7 @@ export const register = async (name: string, email: string, pass: string): Promi
 
     if (!trustEmails)
         await sendVerificationMail(user.name, user.email, verificationToken).catch((e) => {
-            console.log('error sending email', e);
+            logger.error({ err: e, email: user.email }, 'Failed to send verification email');
         });
 
     return user;

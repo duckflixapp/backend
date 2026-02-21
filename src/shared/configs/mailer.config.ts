@@ -2,6 +2,7 @@ import nodemailer from 'nodemailer';
 import { env } from '../../env';
 import { systemSettings } from '../services/system.service';
 import type { SystemSettingsT } from '../schema';
+import { logger } from '../utils/logger';
 
 const sysSettings = await systemSettings.get();
 let emailSettings = sysSettings.external.email;
@@ -27,7 +28,7 @@ export let transporter = createTransporter(sysSettings);
 
 const verifyTransporter = () =>
     transporter.verify().catch(() => {
-        console.error('SMTP verify error.\nPlease check your SMTP credentials');
+        logger.error({ context: 'external_api', service: 'email' }, 'Failed verifying SMTP Credentials');
     });
 
 if (emailSettings.enabled) verifyTransporter();
@@ -45,6 +46,6 @@ systemSettings.addListener('update', (settings: SystemSettingsT) => {
 
     emailSettings = { ...settings.external.email };
     transporter = createTransporter(settings);
-    console.log('SMTP configuration updated');
+    logger.info({ context: 'external_api', service: 'email' }, 'SMTP Configuration updated');
     if (settings.external.email.enabled) verifyTransporter();
 });

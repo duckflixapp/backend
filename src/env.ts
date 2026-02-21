@@ -1,4 +1,5 @@
 import z from 'zod';
+import { logger } from './shared/utils/logger';
 const envSchema = z.object({
     // Server
     PORT: z.coerce.number().default(3000),
@@ -13,6 +14,7 @@ const envSchema = z.object({
     UPLOAD_FILE_LIMIT: z.coerce.number(),
     TEMP_FOLDER: z.string().min(1),
     STORAGE_FOLDER: z.string().min(1),
+    LOG_FOLDER: z.string().min(1),
 
     // Database
     DATABASE_URL: z.url(),
@@ -38,12 +40,12 @@ const envSchema = z.object({
 
 const result = envSchema.safeParse(process.env);
 if (!result.success) {
-    console.error(
-        'Invalid Environment variables:',
+    logger.error(
         result.error.issues.map((issue) => ({
             field: issue.path.join('.'),
             message: issue.message,
-        }))
+        })),
+        'Invalid Environment variables'
     );
     process.exit(1);
 }
