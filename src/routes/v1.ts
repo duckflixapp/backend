@@ -16,7 +16,7 @@ router.use('/auth', authRouter); // can use csrf guard later myb...
 router.use('/users', usersRouter);
 
 router.use('/movies', authenticate(), movieRouter);
-router.use('/media', authenticate(), mediaRouter);
+router.use('/media', mediaRouter);
 
 router.use('/admin', authenticate(), hasRole('admin'), adminRouter);
 router.use('/tasks', authenticate(), hasRole('contributor'), tasksRouter);

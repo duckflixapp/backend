@@ -19,13 +19,14 @@ app.use(
                 defaultSrc: ["'self'"],
                 scriptSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
                 imgSrc: ["'self'", 'data:', 'https://image.tmdb.org'],
-                mediaSrc: ["'self'", env.BASE_URL, env.ORIGIN],
+                mediaSrc: ["'self'", "blob:", "data:", env.BASE_URL, env.ORIGIN],
                 connectSrc: ["'self'", env.BASE_URL],
                 upgradeInsecureRequests: env.NODE_ENV === 'production' ? [] : null,
             },
         },
         crossOriginResourcePolicy: { policy: 'cross-origin' },
         hidePoweredBy: true,
+        crossOriginEmbedderPolicy: false,
     })
 );
 app.use(cors({ origin: env.ORIGIN, credentials: true }));
