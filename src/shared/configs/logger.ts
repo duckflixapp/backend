@@ -1,32 +1,34 @@
-import pino from 'pino';
+import pino, { type TransportTargetOptions } from 'pino';
 import path from 'node:path';
-import { paths } from '../configs/path.config';
+import { paths } from './path.config';
 import pinoHttp from 'pino-http';
 import type { Request, Response } from 'express';
 
 const isProduction = process.env.NODE_ENV === 'production';
 
-const transport = pino.transport({
-    targets: [
-        {
-            target: isProduction ? 'pino/file' : 'pino-pretty',
-            level: 'info',
-            options: { colorize: !isProduction, ignore: 'pid,hostname,reqId,responseTime' },
-        },
-        {
-            target: 'pino-roll',
-            level: 'warn',
-            options: {
-                file: path.join(paths.logs, '/app.log'),
-                frequency: 'daily',
-                size: '10m',
-                mkdir: true,
-            },
-        },
-    ],
+const targets: TransportTargetOptions[] = [];
+
+targets.push({
+    target: isProduction ? 'pino/file' : 'pino-pretty',
+    level: 'debug',
+    options: { colorize: !isProduction, ignore: 'pid,hostname,reqId,responseTime' },
 });
 
-export const logger = pino(transport);
+if (isProduction)
+    targets.push({
+        target: 'pino-roll',
+        level: 'warn',
+        options: {
+            file: path.join(paths.logs, '/app.log'),
+            frequency: 'daily',
+            size: '10m',
+            mkdir: true,
+        },
+    });
+
+const transport = pino.transport({ targets });
+
+export const logger = pino({ level: isProduction ? 'info' : 'debug' }, transport);
 
 const colors = {
     reset: '\x1b[0m',

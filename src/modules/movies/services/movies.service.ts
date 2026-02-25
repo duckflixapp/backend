@@ -20,7 +20,7 @@ import { notifyJobStatus } from '../../../shared/services/notification.service';
 import { computeHash, downloadSubtitles } from './subs.service';
 import { env } from '../../../env';
 import { systemSettings } from '../../../shared/services/system.service';
-import { logger } from '../../../shared/utils/logger';
+import { logger } from '../../../shared/configs/logger';
 
 const rqbitClient = new RqbitClient({ baseUrl: env.RQBIT_URL! });
 const torrentClient = new TorrentClient({ rqbit: rqbitClient });

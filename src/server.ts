@@ -4,7 +4,7 @@ import { pool } from './shared/configs/db';
 import { SocketServer } from './shared/lib/socket';
 import { env } from './env';
 import { initalize } from './initialize';
-import { logger } from './shared/utils/logger';
+import { logger } from './shared/configs/logger';
 
 const PORT = env.PORT;
 

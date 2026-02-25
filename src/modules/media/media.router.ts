@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import * as MediaController from './media.controller';
+import * as LiveMediaController from './live.controller';
 import { limiterConfigs } from '../../shared/limiters';
 import rateLimit from 'express-rate-limit';
 
@@ -21,5 +22,9 @@ const limiterSubtitle = rateLimit({
 
 router.get('/stream/:versionId{/:file}', limiterStream, MediaController.stream);
 router.get('/subtitle/:subtitleId', limiterSubtitle, MediaController.subtitle);
+
+router.get('/live/:movieId/master.m3u8', LiveMediaController.getLiveMaster);
+router.get('/live/:movieId/:height/index.m3u8', LiveMediaController.getLiveManifest);
+router.get('/live/:movieId/:height/:segmentName', LiveMediaController.getLiveSegment);
 
 export default router;

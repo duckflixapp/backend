@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Queue } from './queue';
 import { systemSettings } from '../services/system.service';
-import { logger } from './logger';
+import { logger } from '../configs/logger';
 
 export type Runnable = (...args: unknown[]) => Promise<number>;
 export type TaskStatus = 'working' | 'waiting';

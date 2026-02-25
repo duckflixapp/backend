@@ -1,7 +1,7 @@
 import { db } from '../configs/db';
 import { notifications } from '../schema';
 import { io } from '../../server';
-import { logger } from '../utils/logger';
+import { logger } from '../configs/logger';
 
 const notifyUser = (userId: string, data: unknown) => {
     io.to(`user:${userId}`).emit('notification', data);

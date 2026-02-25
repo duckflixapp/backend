@@ -12,7 +12,7 @@ import { SubtitleDownloadError } from '../movies.errors';
 import { AppError } from '../../../shared/errors';
 import { env } from '../../../env';
 import { systemSettings } from '../../../shared/services/system.service';
-import { logger } from '../../../shared/utils/logger';
+import { logger } from '../../../shared/configs/logger';
 
 const sysSettings = await systemSettings.get();
 const subtitlesClient = new OpenSubtitlesClient({

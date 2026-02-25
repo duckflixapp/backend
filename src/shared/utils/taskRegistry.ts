@@ -1,4 +1,4 @@
-import { logger } from './logger';
+import { logger } from '../configs/logger';
 
 export interface Interruptible {
     stop(): Promise<void> | void;
@@ -6,8 +6,9 @@ export interface Interruptible {
     resume(): Promise<void> | void;
 }
 
-class TaskRegistry {
+export class TaskRegistry {
     private activeJobs = new Map<string, Interruptible>();
+    private pauseRef: number = 0;
 
     public register(id: string, job: Interruptible) {
         this.activeJobs.set(id, job);
@@ -26,11 +27,16 @@ class TaskRegistry {
     }
 
     public async pauseAll() {
+        this.pauseRef++;
+        if (this.pauseRef > 0) return; // already paused
         const promises = Array.from(this.activeJobs.keys()).map(this.pause);
         await Promise.all(promises);
     }
 
     public async resumeAll() {
+        this.pauseRef = Math.min(this.pauseRef - 1, 0);
+        if (this.pauseRef !== 0) return;
+
         const promises = Array.from(this.activeJobs.keys()).map(this.resume);
         await Promise.all(promises);
     }

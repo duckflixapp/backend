@@ -5,7 +5,7 @@ import type { VideoMetadata } from '../services/metadata.service';
 import { env } from '../../../env';
 import { systemSettings } from '../../../shared/services/system.service';
 import type { SystemSettingsT } from '../../../shared/schema';
-import { logger } from '../../../shared/utils/logger';
+import { logger } from '../../../shared/configs/logger';
 
 const sysSettings = await systemSettings.get();
 const tmdbClient = new TMDBClient({ baseUrl: env.TMDB_URL, apiKey: sysSettings.external.tmdb.apiKey });

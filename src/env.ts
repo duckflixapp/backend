@@ -1,5 +1,5 @@
 import z from 'zod';
-import { logger } from './shared/utils/logger';
+import { logger } from './shared/configs/logger';
 const envSchema = z.object({
     // Server
     PORT: z.coerce.number().default(3000),
@@ -14,6 +14,7 @@ const envSchema = z.object({
     UPLOAD_FILE_LIMIT: z.coerce.number(),
     TEMP_FOLDER: z.string().min(1),
     STORAGE_FOLDER: z.string().min(1),
+    LIVE_FOLDER: z.string().min(1),
     LOG_FOLDER: z.string().min(1),
 
     // Database

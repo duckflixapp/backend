@@ -9,7 +9,7 @@ import { streamParamsSchema, subtitleParamsSchema } from './media.validator';
 import { paths } from '../../shared/configs/path.config';
 import { access } from 'node:fs/promises';
 import constants from 'node:constants';
-import { logger } from '../../shared/utils/logger';
+import { logger } from '../../shared/configs/logger';
 
 export const stream = catchAsync(async (req: Request, res: Response) => {
     const { versionId, file } = streamParamsSchema.parse(req.params);

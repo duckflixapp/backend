@@ -4,7 +4,7 @@ import type { UserRole } from '@duckflix/shared';
 import { limits } from '../configs/limits.config';
 import path from 'node:path';
 import fs from 'node:fs';
-import { logger } from './logger';
+import { logger } from '../configs/logger';
 
 const CERTS_DIR = path.resolve('../../certs');
 const PRIVATE_KEY_PATH = path.join(CERTS_DIR, 'private.pem');

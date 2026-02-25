@@ -2,7 +2,7 @@ import nodemailer from 'nodemailer';
 import { env } from '../../env';
 import { systemSettings } from '../services/system.service';
 import type { SystemSettingsT } from '../schema';
-import { logger } from '../utils/logger';
+import { logger } from './logger';
 
 const sysSettings = await systemSettings.get();
 let emailSettings = sysSettings.external.email;

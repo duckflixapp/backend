@@ -6,7 +6,7 @@ import { capitalize } from '../../shared/utils/string';
 import { io } from '../../server';
 import type { DownloadProgress, JobProgress } from '@duckflix/shared';
 import { notifyJobStatus } from '../../shared/services/notification.service';
-import { logger } from '../../shared/utils/logger';
+import { logger } from '../../shared/configs/logger';
 
 export const handleWorkflowError = async (movieId: string, error: unknown, context: 'movie' | 'torrent') => {
     try {

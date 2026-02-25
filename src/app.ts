@@ -3,7 +3,7 @@ import cookieParser from 'cookie-parser';
 import { globalErrorHandler } from './shared/errors';
 import router from './routes/v1';
 import { env } from './env';
-import { httpLogger } from './shared/utils/logger';
+import { httpLogger } from './shared/configs/logger';
 import { helmetConfiguration } from './shared/configs/helmet';
 import { corsConfiguration } from './shared/configs/cors';
 
