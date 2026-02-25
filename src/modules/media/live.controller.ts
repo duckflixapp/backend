@@ -34,10 +34,10 @@ export const getLiveSegment = catchAsync(async (req: Request, res: Response) => 
     if (!indexMatch) throw new AppError('Invalid segment name', { statusCode: 400 });
     const segmentIndex = parseInt(indexMatch[0]);
 
-    const { movie, original } = await LiveMediaService.getMovieWithOriginal(movieId);
-    const path = await LiveMediaService.ensureLiveSegment(movie, original, session, height, { segment: segmentIndex, segmentDuration });
+    const path = await LiveMediaService.ensureLiveSegment(movieId, session, height, { segment: segmentIndex, segmentDuration });
     console.log(path);
 
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     res.setHeader('Content-Type', 'video/MP2T');
     res.sendFile(path);
 });

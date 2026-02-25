@@ -7,6 +7,7 @@ import { SessionTask } from './sessionTask';
 import path from 'node:path';
 import { paths } from '../../shared/configs/path.config';
 import fs from 'node:fs/promises';
+import { AppError } from '../../shared/errors';
 
 const livePresets = [
     { name: '2160p', height: 2160, bitrate: 20000000 },
@@ -25,6 +26,7 @@ const masterStream = (v: { streamUrl: string; width: number; height: number; ban
 
 const mediaBase = `${env.BASE_URL}/media`;
 
+const generatedSessions = new Map<string, { movieId: string; storageKey: string; height: number; duration: number }>();
 export const generateMasterFile = async (movieId: string) => {
     const movie = await db.query.movies.findFirst({ where: eq(movies.id, movieId), with: { versions: true } });
     if (!movie) throw new MovieNotFoundError();
@@ -36,6 +38,12 @@ export const generateMasterFile = async (movieId: string) => {
     const includedHeights = versions.map((v) => v.height);
 
     const session = crypto.randomUUID();
+    generatedSessions.set(session, {
+        movieId: movie.id,
+        storageKey: original.storageKey,
+        height: original.height,
+        duration: movie.duration!,
+    });
 
     let master = `#EXTM3U\n`;
 
@@ -47,15 +55,15 @@ export const generateMasterFile = async (movieId: string) => {
     }
 
     // add every existing version
-    // versions.forEach((v) => {
-    //     master += masterStream({
-    //         streamUrl: `${mediaBase}/stream/${v.id}/index.m3u8`,
-    //         width: v.width ?? 0,
-    //         height: v.height,
-    //         bandwidth: v.height * 2000,
-    //         name: `${v.height}p`,
-    //     });
-    // });
+    versions.forEach((v) => {
+        master += masterStream({
+            streamUrl: `${mediaBase}/stream/${v.id}/index.m3u8`,
+            width: v.width ?? 0,
+            height: v.height,
+            bandwidth: v.height * 2000,
+            name: `${v.height}p`,
+        });
+    });
 
     // add live presets
     const aspect = (original.width || 16) / original.height;
@@ -106,7 +114,9 @@ export const generateManifestFile = async (
 #EXT-X-PLAYLIST-TYPE:VOD\n`;
 
     for (let i = 0; i < totalSegments; i++) {
-        m3u8 += `#EXTINF:${options.segmentDuration}.0,\n`;
+        const duration = i === totalSegments - 1 ? movie.duration! - i * options.segmentDuration : options.segmentDuration;
+
+        m3u8 += `#EXTINF:${duration.toFixed(6)},\n`;
         m3u8 += `${env.BASE_URL}/media/live/${movie.id}/${height}/seg-${i}.ts?session=${session}\n`;
     }
     m3u8 += '#EXT-X-ENDLIST';
@@ -115,13 +125,9 @@ export const generateManifestFile = async (
 };
 
 const sessionRegistry = new Map<string, SessionTask>();
-export const ensureLiveSegment = async (
-    movie: Movie,
-    original: MovieVersion,
-    session: string,
-    height: number,
-    options = { segment: 0, segmentDuration: 6 }
-) => {
+export const ensureLiveSegment = async (movieId: string, session: string, height: number, options = { segment: 0, segmentDuration: 6 }) => {
+    const original = generatedSessions.get(session);
+    if (!original || original.movieId !== movieId) throw new AppError('Session not found', { statusCode: 404 });
     if (height > original.height) throw new TooBigResolutionError();
     if (!presetHeights.includes(height)) throw new NotStandardResolutionError();
 
@@ -129,11 +135,14 @@ export const ensureLiveSegment = async (
     let sessionTask = sessionRegistry.get(session);
     if (!sessionTask) {
         const sourcePath = path.resolve(paths.storage, original.storageKey);
-        sessionTask = new SessionTask(session, sourcePath, sessionPath, options.segmentDuration, height, () => {
+        const totalSegments = Math.ceil(original.duration / options.segmentDuration);
+        sessionTask = new SessionTask(session, sourcePath, sessionPath, options.segmentDuration, height, totalSegments, () => {
             sessionRegistry.delete(session);
+            generatedSessions.delete(session);
             fs.rmdir(sessionPath).catch(() => {});
         });
         sessionRegistry.set(session, sessionTask);
+        await sessionTask.initalize();
     }
 
     await sessionTask.prepareSegment(options.segment, { height });
