@@ -28,13 +28,13 @@ export class TaskRegistry {
 
     public async pauseAll() {
         this.pauseRef++;
-        if (this.pauseRef > 0) return; // already paused
-        const promises = Array.from(this.activeJobs.keys()).map(this.pause);
+        if (this.pauseRef !== 1) return; // already paused
+        const promises = Array.from(this.activeJobs.keys()).map(id => this.pause(id));
         await Promise.all(promises);
     }
 
     public async resumeAll() {
-        this.pauseRef = Math.min(this.pauseRef - 1, 0);
+        this.pauseRef -= 1;
         if (this.pauseRef !== 0) return;
 
         const promises = Array.from(this.activeJobs.keys()).map(this.resume);

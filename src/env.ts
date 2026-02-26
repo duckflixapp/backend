@@ -1,5 +1,4 @@
 import z from 'zod';
-import { logger } from './shared/configs/logger';
 const envSchema = z.object({
     // Server
     PORT: z.coerce.number().default(3000),
@@ -41,7 +40,7 @@ const envSchema = z.object({
 
 const result = envSchema.safeParse(process.env);
 if (!result.success) {
-    logger.error(
+    console.error(
         result.error.issues.map((issue) => ({
             field: issue.path.join('.'),
             message: issue.message,

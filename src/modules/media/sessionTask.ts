@@ -3,6 +3,7 @@ import { logger } from '../../shared/configs/logger';
 import type { Subprocess } from 'bun';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { taskRegistry } from '../../shared/utils/taskRegistry';
 
 export class SessionTask {
     private process: Subprocess | null = null;
@@ -81,7 +82,7 @@ export class SessionTask {
             timeout = setTimeout(() => {
                 this.notifier.removeListener(`ready_${segment}`, listener);
                 reject();
-            }, 30_000); // 30s is more than enough for fail request
+            }, 20_000); // 20s is more than enough for fail request
 
             this.notifier.once(`ready_${segment}`, listener);
         });
@@ -171,7 +172,9 @@ export class SessionTask {
             })();
 
             logger.debug({ segment, session: this.session }, 'FFmpeg started');
+            taskRegistry.pauseAll();
             await proc.exited;
+            taskRegistry.resumeAll();
             logger.debug({ segment, session: this.session, statusCode: proc.exitCode }, 'FFmpeg exited');
             this.process = null;
 
@@ -203,12 +206,12 @@ export class SessionTask {
         this.inactivityTimer = setTimeout(() => {
             logger.debug({ session: this.session }, 'Session inactive, killing FFmpeg');
             this.destroy();
-        }, 60_000);
+        }, 45_000);
     }
 
     private async stopReset() {
         if (this.process) {
-            this.process.kill();
+            this.process.kill(9);
             await this.process.exited.catch(() => {});
             this.process = null;
         }
@@ -218,6 +221,10 @@ export class SessionTask {
     }
 
     public async destroy() {
+        if (this.inactivityTimer) {
+            clearTimeout(this.inactivityTimer);
+            this.inactivityTimer = null;
+        }
         await this.stopReset();
         this.onCleanup();
 

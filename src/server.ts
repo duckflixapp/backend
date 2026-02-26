@@ -5,6 +5,7 @@ import { SocketServer } from './shared/lib/socket';
 import { env } from './env';
 import { initalize } from './initialize';
 import { logger } from './shared/configs/logger';
+import { sessionRegistry } from './modules/media/live.service';
 
 const PORT = env.PORT;
 
@@ -21,5 +22,6 @@ const server = httpServer.listen(PORT, () => {
 process.on('SIGINT', async () => {
     server.close();
     await pool.end();
+    sessionRegistry.values().forEach(s => s.destroy());
     process.exit(0);
 });

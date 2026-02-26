@@ -124,7 +124,7 @@ export const generateManifestFile = async (
     return m3u8;
 };
 
-const sessionRegistry = new Map<string, SessionTask>();
+export const sessionRegistry = new Map<string, SessionTask>();
 export const ensureLiveSegment = async (movieId: string, session: string, height: number, options = { segment: 0, segmentDuration: 6 }) => {
     const original = generatedSessions.get(session);
     if (!original || original.movieId !== movieId) throw new AppError('Session not found', { statusCode: 404 });
@@ -139,7 +139,7 @@ export const ensureLiveSegment = async (movieId: string, session: string, height
         sessionTask = new SessionTask(session, sourcePath, sessionPath, options.segmentDuration, height, totalSegments, () => {
             sessionRegistry.delete(session);
             generatedSessions.delete(session);
-            fs.rmdir(sessionPath).catch(() => {});
+            fs.rm(sessionPath, { recursive: true, force: true }).catch(() => {});
         });
         sessionRegistry.set(session, sessionTask);
         await sessionTask.initalize();
