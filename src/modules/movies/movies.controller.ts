@@ -50,9 +50,9 @@ export const upload = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const getMany = catchAsync(async (req: Request, res: Response) => {
-    const { page, limit, search } = movieQuerySchema.parse(req.query);
+    const options = movieQuerySchema.parse(req.query);
 
-    const paginatedResults = await MoviesService.getMovies(page, limit, search);
+    const paginatedResults = await MoviesService.getMovies(options);
 
     res.status(200).json({
         status: 'success',

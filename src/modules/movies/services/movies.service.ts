@@ -1,6 +1,6 @@
 import path from 'node:path';
 import fs from 'node:fs/promises';
-import { and, count, desc, eq, ilike, inArray } from 'drizzle-orm';
+import { and, asc, count, desc, eq, ilike, inArray, sql } from 'drizzle-orm';
 import { db } from '../../../shared/configs/db';
 import { genres, libraries, libraryItems, movies, moviesToGenres, movieVersions } from '../../../shared/schema';
 import { InvalidVideoFileError, MovieNotCreatedError, MovieNotFoundError, TorrentDownloadError } from '../movies.errors';
@@ -250,22 +250,43 @@ export const processMovieWorkflow = async (data: {
     if (tasksToRun.size > 0) startProcessing(data.movieId, Array.from(tasksToRun), paths.storage, finalPath);
 };
 
-export const getMovies = async (page: number, limit: number, search?: string): Promise<PaginatedResponse<MovieDTO>> => {
-    const offset = (page - 1) * limit;
+const getOrderBy = (orderBy: string | null) => {
+    switch (orderBy) {
+        case 'oldest':
+            return [asc(movies.createdAt)];
+        case 'rating':
+            return [desc(sql`cast(${movies.rating} as decimal)`), desc(movies.createdAt)];
+        case 'title':
+            return [asc(movies.title)];
+        case 'newest':
+        default:
+            return [desc(movies.createdAt)];
+    }
+};
 
-    const searchFilter = search ? ilike(movies.title, `%${search}%`) : null;
+export const getMovies = async (options: {
+    page: number;
+    limit: number;
+    search?: string;
+    orderBy?: string;
+}): Promise<PaginatedResponse<MovieDTO>> => {
+    const offset = (options.page - 1) * options.limit;
+
+    const searchFilter = options.search ? ilike(movies.title, `%${options.search}%`) : null;
     const readyFilter = eq(movies.status, 'ready');
 
     const conditions = [searchFilter, readyFilter];
     const filters = and(...conditions.filter((cond) => cond != null));
 
+    const orderBy = getOrderBy(options.orderBy ?? null);
+
     const [totalResult, results] = await Promise.all([
         db.select({ value: count() }).from(movies).where(filters),
         db.query.movies.findMany({
             where: filters,
-            limit: limit,
+            limit: options.limit,
             offset: offset,
-            orderBy: [desc(movies.createdAt)],
+            orderBy,
             with: {
                 genres: {
                     with: {
@@ -285,9 +306,9 @@ export const getMovies = async (page: number, limit: number, search?: string): P
         meta: {
             totalItems,
             itemCount: results.length,
-            itemsPerPage: limit,
-            totalPages: Math.ceil(totalItems / limit),
-            currentPage: page,
+            itemsPerPage: options.limit,
+            totalPages: Math.ceil(totalItems / options.limit),
+            currentPage: options.page,
         },
     };
 };
