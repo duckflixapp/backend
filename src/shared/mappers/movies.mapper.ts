@@ -50,13 +50,15 @@ export const toMovieDetailedDTO = (
     movie: Movie & {
         genres: { genre: Genre }[];
         versions: MovieVersion[];
-        uploader?: { id: string; name: string; role: UserRole };
+        uploader: { id: string; name: string; role: UserRole } | null;
         subtitles: Subtitle[];
-    }
+    },
+    inUserLibrary?: boolean | null
 ): MovieDetailedDTO => ({
     ...toMovieDTO(movie),
     description: movie.description,
     versions: movie.versions.map(toMovieVersionDTO),
     subtitles: movie.subtitles.map(toSubtitleDTO),
     uploader: movie.uploader ? toUserMinDTO(movie.uploader) : null,
+    inUserLibrary: inUserLibrary ?? null,
 });

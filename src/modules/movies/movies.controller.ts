@@ -61,8 +61,9 @@ export const getMany = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const getOne = catchAsync(async (req: Request, res: Response) => {
+    const userId = req.user!.id;
     const { id } = movieParamsSchema.parse(req.params);
-    const movieDto = await MoviesService.getMovieById(id);
+    const movieDto = await MoviesService.getMovieById(id, { userId });
 
     if (!movieDto) throw new AppError('Movie not found', { statusCode: 404 });
 

@@ -1,7 +1,7 @@
-import type { LibraryDTO, LibraryItemDTO, LibraryMinDTO } from '@duckflix/shared';
+import type { LibraryDTO, LibraryItemDTO, LibraryMinDTO, PaginatedResponse } from '@duckflix/shared';
 import { db } from '../../shared/configs/db';
 import { libraries, libraryItems, movies } from '../../shared/schema';
-import { and, count, eq, sql } from 'drizzle-orm';
+import { and, count, desc, eq, ilike, sql } from 'drizzle-orm';
 import { toLibraryDTO, toLibraryItemDTO, toLibraryMinDTO } from '../../shared/mappers/library.mapper';
 import { AppError } from '../../shared/errors';
 import { isDuplicateKey } from '../../shared/db.errors';
@@ -71,11 +71,15 @@ export const deleteUserLibrary = async (userId: string, libraryId: string): Prom
 
 export const addMovieToUserLibrary = async (userId: string, libraryId: string, movieId: string): Promise<void> => {
     try {
+        const conditions = [];
+        conditions.push(eq(libraries.userId, userId));
+        if (libraryId === 'library') conditions.push(eq(libraries.type, 'library'));
+        else conditions.push(eq(libraries.id, libraryId));
+
+        const filters = and(...conditions);
+
         await db.transaction(async (tx) => {
-            const [library] = await tx
-                .select({ id: libraries.id })
-                .from(libraries)
-                .where(and(eq(libraries.id, libraryId), eq(libraries.userId, userId)));
+            const [library] = await tx.select({ id: libraries.id }).from(libraries).where(filters);
             if (!library) throw new LibraryNotFoundError();
 
             const [movie] = await tx.select({ id: movies.id }).from(movies).where(eq(movies.id, movieId));
@@ -97,14 +101,23 @@ export const addMovieToUserLibrary = async (userId: string, libraryId: string, m
 };
 
 export const removeMovieFromUserLibrary = async (userId: string, libraryId: string, movieId: string): Promise<void> => {
+    const conditions = [];
+    conditions.push(eq(libraries.userId, userId));
+    if (libraryId === 'library') conditions.push(eq(libraries.type, 'library'));
+    else conditions.push(eq(libraries.id, libraryId));
+
+    const filters = and(...conditions);
+
     await db.transaction(async (tx) => {
-        const [library] = await tx
-            .select({ id: libraries.id })
-            .from(libraries)
-            .where(and(eq(libraries.id, libraryId), eq(libraries.userId, userId)));
+        const [library] = await tx.select({ id: libraries.id }).from(libraries).where(filters);
         if (!library) throw new LibraryNotFoundError();
 
-        await tx.delete(libraryItems).where(and(eq(libraryItems.libraryId, libraryId), eq(libraryItems.movieId, movieId)));
+        const modified = await tx
+            .delete(libraryItems)
+            .where(and(eq(libraryItems.libraryId, library.id), eq(libraryItems.movieId, movieId)));
+
+        if (modified.rowCount === 0) throw new AppError('Movie not found in library', { statusCode: 404 });
+
         await tx
             .update(libraries)
             .set({ size: sql`${libraries.size} - 1` })
@@ -123,8 +136,23 @@ export const getUserLibrary = async (userId: string, libraryId: string): Promise
     return toLibraryDTO(result);
 };
 
-export const getUserLibraryItems = async (userId: string, libraryId: string): Promise<LibraryItemDTO[]> => {
-    const results = await db.transaction(async (tx) => {
+export const getUserLibraryItems = async (
+    userId: string,
+    libraryId: string,
+    options: {
+        page: number;
+        limit: number;
+        search?: string;
+    }
+): Promise<PaginatedResponse<LibraryItemDTO>> => {
+    const offset = (options.page - 1) * options.limit;
+
+    const searchFilter = options.search ? ilike(movies.title, `%${options.search}%`) : null;
+
+    const conditions = [searchFilter, eq(libraryItems.libraryId, libraryId)];
+    const filters = and(...conditions.filter((cond) => cond != null));
+
+    const [results, total] = await db.transaction(async (tx) => {
         const [library] = await tx
             .select({ id: libraries.id })
             .from(libraries)
@@ -132,11 +160,35 @@ export const getUserLibraryItems = async (userId: string, libraryId: string): Pr
 
         if (!library) throw new LibraryNotFoundError();
 
-        return await tx.query.libraryItems.findMany({
-            where: eq(libraryItems.libraryId, library.id),
-            with: { movie: true },
-        });
+        return Promise.all([
+            tx
+                .select({
+                    id: libraryItems.id,
+                    libraryId: libraryItems.libraryId,
+                    movieId: libraryItems.movieId,
+                    addedAt: libraryItems.addedAt,
+                    movie: movies,
+                })
+                .from(libraryItems)
+                .innerJoin(movies, eq(libraryItems.movieId, movies.id))
+                .where(filters)
+                .limit(options.limit)
+                .offset(offset)
+                .orderBy(desc(movies.createdAt)),
+            tx.select({ value: count() }).from(libraryItems).innerJoin(movies, eq(libraryItems.movieId, movies.id)).where(filters),
+        ]);
     });
 
-    return results.map(toLibraryItemDTO);
+    const totalItems = total[0]?.value ?? 0;
+
+    return {
+        data: results.map(toLibraryItemDTO),
+        meta: {
+            totalItems,
+            itemCount: results.length,
+            itemsPerPage: options.limit,
+            totalPages: Math.ceil(totalItems / options.limit),
+            currentPage: options.page,
+        },
+    };
 };

@@ -2,7 +2,7 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 import { and, count, desc, eq, ilike, inArray } from 'drizzle-orm';
 import { db } from '../../../shared/configs/db';
-import { genres, movies, moviesToGenres, movieVersions } from '../../../shared/schema';
+import { genres, libraries, libraryItems, movies, moviesToGenres, movieVersions } from '../../../shared/schema';
 import { InvalidVideoFileError, MovieNotCreatedError, MovieNotFoundError, TorrentDownloadError } from '../movies.errors';
 import { randomUUID } from 'node:crypto';
 import { ffprobe } from '../../../shared/utils/videoProcessor';
@@ -292,7 +292,7 @@ export const getMovies = async (page: number, limit: number, search?: string): P
     };
 };
 
-export const getMovieById = async (id: string): Promise<MovieDetailedDTO | null> => {
+export const getMovieById = async (id: string, options: { userId: string | null } = { userId: null }): Promise<MovieDetailedDTO | null> => {
     const result = await db.query.movies.findFirst({
         where: eq(movies.id, id),
         with: {
@@ -315,5 +315,16 @@ export const getMovieById = async (id: string): Promise<MovieDetailedDTO | null>
 
     if (!result) throw new MovieNotFoundError();
 
-    return toMovieDetailedDTO(result);
+    let inLibrary: boolean | null = null;
+    if (options.userId) {
+        const [libraryCount] = await db
+            .select({ value: count() })
+            .from(libraries)
+            .leftJoin(libraryItems, eq(libraries.id, libraryItems.libraryId))
+            .where(and(eq(libraries.type, 'library'), eq(libraries.userId, options.userId), eq(libraryItems.movieId, id)));
+
+        inLibrary = !!libraryCount?.value && libraryCount?.value > 0;
+    }
+
+    return toMovieDetailedDTO(result, inLibrary);
 };

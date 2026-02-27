@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import { catchAsync } from '../../shared/utils/catchAsync';
 import * as LibraryService from './library.service';
-import { getUserLibrariesScheme, libraryScheme, libraryMovieItemScheme, newLibraryScheme } from './library.validator';
+import { getUserLibrariesScheme, libraryScheme, libraryMovieItemScheme, newLibraryScheme, libraryQuerySchema } from './library.validator';
 
 export const getUserLibraries = catchAsync(async (req: Request, res: Response) => {
     const userId = req.user!.id;
@@ -43,10 +43,11 @@ export const removeLibrary = catchAsync(async (req: Request, res: Response) => {
 export const getLibraryMovies = catchAsync(async (req: Request, res: Response) => {
     const userId = req.user!.id;
     const { id: libraryId } = libraryScheme.parse(req.params);
+    const options = libraryQuerySchema.parse(req.query);
 
-    const results = await LibraryService.getUserLibraryItems(userId, libraryId);
+    const paginatedResults = await LibraryService.getUserLibraryItems(userId, libraryId, options);
 
-    res.status(200).json({ status: 'success', data: results });
+    res.status(200).json({ status: 'success', ...paginatedResults });
 });
 
 export const addMovie = catchAsync(async (req: Request, res: Response) => {

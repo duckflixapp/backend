@@ -1,5 +1,11 @@
 import z from 'zod';
 
+export const libraryQuerySchema = z.object({
+    page: z.coerce.number().int().positive().max(10000, 'Page limit exceeded').default(1),
+    limit: z.coerce.number().int().positive().max(100).default(20),
+    search: z.string().max(100, 'Search query too long').optional(),
+});
+
 export const getUserLibrariesScheme = z.object({
     custom: z.boolean().optional(),
 });
@@ -14,7 +20,7 @@ export const newLibraryScheme = z.object({
 });
 
 export const libraryMovieItemScheme = z.object({
-    libraryId: z.uuid(),
+    libraryId: z.union([z.literal('library'), z.uuid()]),
     movieId: z.uuid(),
 });
 
