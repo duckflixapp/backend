@@ -1,7 +1,7 @@
 import { logger } from '../configs/logger';
 
 export interface Interruptible {
-    stop(): Promise<void> | void;
+    kill(): Promise<void> | void;
     pause(): Promise<void> | void;
     resume(): Promise<void> | void;
 }
@@ -21,7 +21,7 @@ export class TaskRegistry {
     public async kill(id: string) {
         const job = this.activeJobs.get(id);
         if (!job) return false;
-        await job.stop();
+        await job.kill();
         this.activeJobs.delete(id);
         return true;
     }
@@ -29,7 +29,7 @@ export class TaskRegistry {
     public async pauseAll() {
         this.pauseRef++;
         if (this.pauseRef !== 1) return; // already paused
-        const promises = Array.from(this.activeJobs.keys()).map(id => this.pause(id));
+        const promises = Array.from(this.activeJobs.keys()).map((id) => this.pause(id));
         await Promise.all(promises);
     }
 

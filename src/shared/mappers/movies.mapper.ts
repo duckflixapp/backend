@@ -58,6 +58,7 @@ export const toMovieDetailedDTO = (
     ...toMovieDTO(movie),
     description: movie.description,
     versions: movie.versions.map(toMovieVersionDTO),
+    generatedVersions: null,
     subtitles: movie.subtitles.map(toSubtitleDTO),
     uploader: movie.uploader ? toUserMinDTO(movie.uploader) : null,
     inUserLibrary: inUserLibrary ?? null,

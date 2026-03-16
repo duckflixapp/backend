@@ -22,6 +22,6 @@ const server = httpServer.listen(PORT, () => {
 process.on('SIGINT', async () => {
     server.close();
     await pool.end();
-    sessionRegistry.values().forEach(s => s.destroy());
+    sessionRegistry.values().forEach((s) => s.destroy());
     process.exit(0);
 });

@@ -2,8 +2,8 @@ import { EventEmitter } from 'node:events';
 import { logger } from '../../shared/configs/logger';
 import type { Subprocess } from 'bun';
 import fs from 'node:fs/promises';
-import path from 'node:path';
 import { taskRegistry } from '../../shared/utils/taskRegistry';
+import { createJitRunner } from '../../shared/video';
 
 export class SessionTask {
     private process: Subprocess | null = null;
@@ -65,8 +65,8 @@ export class SessionTask {
                     clearTimeout(timeout);
                     resolve();
                 };
-                timeout = setTimeout(() => reject(), 30_000);
-                this.notifier.once(`ready_${segment}`, listener); // once umesto on
+                timeout = setTimeout(() => reject(), 18_000);
+                this.notifier.once(`ready_${segment}`, listener);
                 return;
             }
 
@@ -89,96 +89,31 @@ export class SessionTask {
     }
 
     private async transcode(segment: number) {
-        const startTime = segment * this.segmentDuration;
-        const args = [
-            'ffmpeg',
-            '-ss',
-            startTime.toString(),
-            '-i',
-            this.originalPath,
-            '-output_ts_offset',
-            startTime.toString(),
-            '-map',
-            '0:v:0',
-            '-map',
-            '0:a:0?',
-            '-c:v',
-            'libx264',
-            '-preset',
-            'ultrafast',
-            '-tune',
-            'zerolatency',
-            '-force_key_frames',
-            `expr:gte(t,${startTime})`,
-            '-vf',
-            `scale=-2:${this.height}`,
-            '-c:a',
-            'aac',
-            '-ac',
-            '2',
-            '-ar',
-            '44100',
-            '-f',
-            'hls',
-            '-hls_time',
-            this.segmentDuration.toString(),
-            '-start_number',
-            segment.toString(),
-            '-hls_segment_filename',
-            path.join(this.outputPath, 'seg-%d.ts'),
-            '-hls_flags',
-            'temp_file+independent_segments',
-            '-hls_list_size',
-            '0',
-            path.join(this.outputPath, 'index.m3u8'),
-        ];
+        const runner = await createJitRunner({
+            input: this.originalPath,
+            outputDir: this.outputPath,
+            segment,
+            height: this.height,
+            duration: this.segmentDuration,
+        });
+
+        this.process = runner.proc;
+
+        runner.onSegment!((segNum) => {
+            logger.debug({ segNum }, 'Segment Ready via Runner');
+            this.readySegments.add(segNum);
+            this.notifier.emit(`ready_${segNum}`);
+        });
 
         try {
-            const proc = (this.process = Bun.spawn(args, {
-                stdout: 'inherit',
-                stderr: 'pipe',
-                onExit: (proc, exitCode, signalCode) => {
-                    if (exitCode !== 0 && exitCode !== null) {
-                        logger.error({ exitCode, signalCode, session: this.session }, 'FFmpeg process exited with error');
-                        this.notifier.emit(`error_${segment}`, new Error(`FFmpeg exited with code ${exitCode}`));
-                    }
-                },
-            }));
-            this.process = proc;
-
-            const reader = proc.stderr.getReader();
-            const decoder = new TextDecoder();
-            (async () => {
-                let pendingSegment: number | null = null;
-
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-                    const text = decoder.decode(value);
-
-                    const segMatch = text.match(/Opening '.*?seg-(\d+)\.ts\.tmp' for writing/);
-                    if (segMatch) {
-                        pendingSegment = parseInt(segMatch[1]!);
-                    }
-
-                    if (text.includes('index.m3u8.tmp') && pendingSegment !== null) {
-                        const segNum = pendingSegment;
-                        pendingSegment = null;
-                        logger.debug({ segNum }, 'New Segment');
-                        this.readySegments.add(segNum);
-                        this.notifier.emit(`ready_${segNum}`);
-                    }
-                }
-            })();
-
             logger.debug({ segment, session: this.session }, 'FFmpeg started');
             taskRegistry.pauseAll();
-            await proc.exited;
+            await runner.proc.exited;
             taskRegistry.resumeAll();
-            logger.debug({ segment, session: this.session, statusCode: proc.exitCode }, 'FFmpeg exited');
+            logger.debug({ segment, session: this.session, statusCode: runner.proc.exitCode }, 'FFmpeg exited');
             this.process = null;
 
-            logger.debug({ code: proc.exitCode }, 'FFmpeg finished');
+            logger.debug({ code: runner.proc.exitCode }, 'FFmpeg finished');
         } catch (err) {
             logger.error({ err, session: this.session }, 'Failed to spawn FFmpeg');
             throw err;
@@ -204,7 +139,7 @@ export class SessionTask {
         if (this.inactivityTimer) clearTimeout(this.inactivityTimer);
 
         this.inactivityTimer = setTimeout(() => {
-            logger.debug({ session: this.session }, 'Session inactive, killing FFmpeg');
+            logger.debug({ session: this.session, height: this.height }, 'Session inactive, killing FFmpeg');
             this.destroy();
         }, 45_000);
     }

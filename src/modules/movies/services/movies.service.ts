@@ -5,9 +5,9 @@ import { db } from '../../../shared/configs/db';
 import { genres, libraries, libraryItems, movies, moviesToGenres, movieVersions } from '../../../shared/schema';
 import { InvalidVideoFileError, MovieNotCreatedError, MovieNotFoundError, TorrentDownloadError } from '../movies.errors';
 import { randomUUID } from 'node:crypto';
-import { ffprobe } from '../../../shared/utils/videoProcessor';
+import { ffprobe } from '../../../shared/video';
 import { createMovieStorageKey, startProcessing } from '../movies.processor';
-import type { DownloadProgress, MovieDetailedDTO, MovieDTO, PaginatedResponse } from '@duckflix/shared';
+import type { DownloadProgress, MovieDetailedDTO, MovieDTO, MovieVersionDTO, PaginatedResponse } from '@duckflix/shared';
 import { toMovieDetailedDTO, toMovieDTO } from '../../../shared/mappers/movies.mapper';
 import { getMimeTypeFromFormat } from '../../../shared/utils/ffmpeg';
 import { paths } from '../../../shared/configs/path.config';
@@ -356,5 +356,28 @@ export const getMovieById = async (id: string, options: { userId: string | null 
         inLibrary = !!libraryCount?.value && libraryCount?.value > 0;
     }
 
-    return toMovieDetailedDTO(result, inLibrary);
+    const dto = toMovieDetailedDTO(result, inLibrary);
+
+    const original = result.versions.find((v) => v.isOriginal);
+    if (original && result.duration) {
+        const livePresets = [2160, 1440, 1080, 720, 480];
+        const existingHeights = result.versions.map((v) => v.height);
+
+        const liveVersions: MovieVersionDTO[] = livePresets
+            .filter((h) => h <= original.height && !existingHeights.includes(h))
+            .map((h) => ({
+                id: `live-${h}`,
+                height: h,
+                width: Math.round(((original.width ?? 1920) * h) / original.height / 2) * 2,
+                mimeType: 'application/x-mpegURL',
+                streamUrl: `${env.BASE_URL}/media/live/${id}/${h}/index.m3u8`,
+                status: 'ready',
+                isOriginal: false,
+                fileSize: null,
+            }));
+
+        dto.generatedVersions = liveVersions;
+    }
+
+    return dto;
 };

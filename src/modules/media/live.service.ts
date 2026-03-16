@@ -131,17 +131,18 @@ export const ensureLiveSegment = async (movieId: string, session: string, height
     if (height > original.height) throw new TooBigResolutionError();
     if (!presetHeights.includes(height)) throw new NotStandardResolutionError();
 
-    const sessionPath = path.resolve(paths.live, session);
-    let sessionTask = sessionRegistry.get(session);
+    const sessionPath = path.resolve(paths.live, session, String(height));
+    const sessionKey = `${session}:${height}`;
+    let sessionTask = sessionRegistry.get(sessionKey);
     if (!sessionTask) {
         const sourcePath = path.resolve(paths.storage, original.storageKey);
         const totalSegments = Math.ceil(original.duration / options.segmentDuration);
         sessionTask = new SessionTask(session, sourcePath, sessionPath, options.segmentDuration, height, totalSegments, () => {
-            sessionRegistry.delete(session);
-            generatedSessions.delete(session);
+            sessionRegistry.delete(sessionKey);
+            // generatedSessions.delete(session);
             fs.rm(sessionPath, { recursive: true, force: true }).catch(() => {});
         });
-        sessionRegistry.set(session, sessionTask);
+        sessionRegistry.set(sessionKey, sessionTask);
         await sessionTask.initalize();
     }
 
