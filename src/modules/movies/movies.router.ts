@@ -56,6 +56,17 @@ router.post(
 );
 
 router.get(
+    '/featured',
+    rateLimit({
+        ...limiterConfigs.defaults(),
+        windowMs: 2 * 1000, // 30 per 2s
+        limit: 30,
+        keyGenerator: limiterConfigs.authenticatedKey,
+    }),
+    MoviesController.getFeatured
+);
+
+router.get(
     '/:id',
     rateLimit({
         ...limiterConfigs.defaults(),

@@ -1,6 +1,6 @@
 import path from 'node:path';
 import fs from 'node:fs/promises';
-import { and, asc, count, desc, eq, exists, ilike, inArray, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, exists, ilike, inArray, isNotNull, sql } from 'drizzle-orm';
 import { db } from '../../../shared/configs/db';
 import { genres, libraries, libraryItems, movies, moviesToGenres, movieVersions } from '../../../shared/schema';
 import { InvalidVideoFileError, MovieNotCreatedError, MovieNotFoundError, TorrentDownloadError } from '../movies.errors';
@@ -380,6 +380,24 @@ export const getMovieById = async (id: string, options: { userId: string | null 
     }
 
     return dto;
+};
+
+export const getFeatured = async (options: { userId: string | null } = { userId: null }) => {
+    // internal logic to find featured movie...
+    const featured = await db.query.movies.findFirst({
+        where: and(eq(movies.status, 'ready'), isNotNull(movies.bannerUrl)),
+        with: {
+            versions: {
+                where: and(eq(movieVersions.status, 'ready'), eq(movieVersions.isOriginal, true)),
+                columns: { id: true },
+            },
+        },
+        orderBy: desc(movies.createdAt),
+    });
+
+    if (!featured) return null;
+
+    return getMovieById(featured.id, options);
 };
 
 export const recordWatchStart = async (_movieId: string, _userId: string) => {};

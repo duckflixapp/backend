@@ -60,6 +60,18 @@ export const getMany = catchAsync(async (req: Request, res: Response) => {
     });
 });
 
+export const getFeatured = catchAsync(async (req: Request, res: Response) => {
+    const userId = req.user!.id;
+    const movieDto = await MoviesService.getFeatured({ userId });
+
+    if (!movieDto) throw new AppError('Movie not found', { statusCode: 404 });
+
+    res.status(200).json({
+        status: 'success',
+        data: { movie: movieDto },
+    });
+});
+
 export const getOne = catchAsync(async (req: Request, res: Response) => {
     const userId = req.user!.id;
     const { id } = movieParamsSchema.parse(req.params);
