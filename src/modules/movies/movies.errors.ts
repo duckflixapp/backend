@@ -18,6 +18,12 @@ export class MovieVersionNotFoundError extends AppError {
     }
 }
 
+export class OriginalMovieVersionNotFoundError extends AppError {
+    constructor() {
+        super('The requested movie has no original version.', { statusCode: 404 });
+    }
+}
+
 export class VideoProcessingError extends AppError {
     constructor(message: string, e?: unknown) {
         super(message, { statusCode: 500, cause: e });

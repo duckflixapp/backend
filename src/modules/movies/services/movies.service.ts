@@ -1,29 +1,17 @@
-import path from 'node:path';
-import fs from 'node:fs/promises';
 import { and, asc, count, desc, eq, exists, ilike, inArray, isNotNull, sql } from 'drizzle-orm';
 import { db } from '../../../shared/configs/db';
 import { genres, libraries, libraryItems, movies, moviesToGenres, movieVersions } from '../../../shared/schema';
-import { InvalidVideoFileError, MovieNotCreatedError, MovieNotFoundError, TorrentDownloadError } from '../movies.errors';
-import { randomUUID } from 'node:crypto';
-import { ffprobe } from '../../../shared/video';
-import { createMovieStorageKey, startProcessing } from '../movies.processor';
-import type { DownloadProgress, MovieDetailedDTO, MovieDTO, MovieVersionDTO, PaginatedResponse } from '@duckflix/shared';
+import { MovieNotCreatedError, MovieNotFoundError } from '../movies.errors';
+import type { MovieDetailedDTO, MovieDTO, MovieVersionDTO, PaginatedResponse } from '@duckflix/shared';
 import { toMovieDetailedDTO, toMovieDTO } from '../../../shared/mappers/movies.mapper';
-import { getMimeTypeFromFormat } from '../../../shared/utils/ffmpeg';
-import { paths } from '../../../shared/configs/path.config';
 import { AppError } from '../../../shared/errors';
-import { TorrentClient, validateTorrentFileSize } from '../../../shared/utils/torrent';
 import type { VideoMetadata } from './metadata.service';
-import { RqbitClient } from '../../../shared/lib/rqbit';
-import { emitMovieProgress } from '../movies.handler';
-import { notifyJobStatus } from '../../../shared/services/notification.service';
-import { computeHash, downloadSubtitles } from './subs.service';
 import { env } from '../../../env';
-import { systemSettings } from '../../../shared/services/system.service';
-import { logger } from '../../../shared/configs/logger';
-
-const rqbitClient = new RqbitClient({ baseUrl: env.RQBIT_URL! });
-const torrentClient = new TorrentClient({ rqbit: rqbitClient });
+import path from 'node:path';
+import { paths } from '../../../shared/configs/path.config';
+import fs from 'node:fs/promises';
+import { taskRegistry } from '../../../shared/utils/taskRegistry';
+import { taskHandler } from '../../../shared/utils/taskHandler';
 
 export const initiateUpload = async (
     data: {
@@ -57,197 +45,12 @@ export const initiateUpload = async (
             });
     }
 
-    const selectedGenres = data.genreIds.length > 0 ? await db.select().from(genres).where(inArray(genres.id, data.genreIds)) : [];
+    const selectedGenres =
+        data.genreIds && data.genreIds.length > 0 ? await db.select().from(genres).where(inArray(genres.id, data.genreIds)) : [];
     return toMovieDTO({
         ...dbMovie,
         genres: selectedGenres.map((genre) => ({ genre })),
     });
-};
-
-export const processTorrentFileWorkflow = async (data: { userId: string; movieId: string; torrentPath: string; imdbId: string | null }) => {
-    let torrentBuffer: Buffer;
-    try {
-        const valid = await validateTorrentFileSize(data.torrentPath);
-        if (!valid) throw new AppError('Torrent file is too large', { statusCode: 400 });
-
-        torrentBuffer = await fs.readFile(data.torrentPath);
-    } catch (err) {
-        throw err;
-    } finally {
-        await fs.unlink(data.torrentPath).catch(() => {});
-    }
-
-    await fs.mkdir(paths.downloads, { recursive: true });
-
-    const torrent = await torrentClient.download(torrentBuffer).catch((e) => {
-        throw new TorrentDownloadError(e);
-    });
-
-    torrent.addListener('progress', (progress) => emitMovieProgress(data.movieId, 'downloading', progress as DownloadProgress));
-
-    torrent.addListener('error', ({ error, code }) => {
-        logger.debug(
-            {
-                err: error,
-                errorCode: code,
-                movieId: data.movieId,
-                context: 'torrent_client',
-            },
-            'Torrent download status error'
-        );
-    });
-
-    try {
-        logger.info({ movieId: data.movieId }, 'Torrent waiting for download...');
-        await torrent.waitDownload();
-        logger.info({ movieId: data.movieId }, 'Torrent download finished...');
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
-        fs.rm(torrent.dir, { recursive: true, force: true }).catch(() => {});
-        throw new TorrentDownloadError(err);
-    }
-
-    try {
-        await db.update(movies).set({ status: 'processing' }).where(eq(movies.id, data.movieId));
-        notifyJobStatus(data.userId, 'downloaded', `Movie downloaded`, `Movie download completed. Processing...`, data.movieId).catch(
-            () => {}
-        );
-    } catch (e) {
-        await fs.rm(torrent.dir, { recursive: true, force: true }).catch(() => {});
-        torrent.destroy().catch(() => {});
-        throw new AppError('Error changing video status and notifying', { cause: e });
-    }
-
-    let safePath, mainFile;
-    try {
-        mainFile = torrent.files.reduce((p, c) => (p.length > c.length ? p : c));
-        const downloadedPath = path.join(torrent.dir, mainFile.name);
-
-        const ext = path.extname(mainFile.name);
-        safePath = path.join(paths.downloads, `${data.movieId}-torrent${ext}`);
-        await fs.rename(downloadedPath, safePath);
-    } catch (e) {
-        throw new AppError('Video could not be copied after downloading', { cause: e });
-    } finally {
-        await fs.rm(torrent.dir, { recursive: true, force: true }).catch(() => {});
-        torrent.destroy().catch(() => {}); // ignore error
-    }
-
-    await processMovieWorkflow({
-        userId: data.userId,
-        movieId: data.movieId,
-        tempPath: safePath,
-        originalName: mainFile.name,
-        fileSize: mainFile.length,
-        imdbId: data.imdbId,
-    });
-};
-
-export const processMovieWorkflow = async (data: {
-    userId: string;
-    movieId: string;
-    tempPath: string;
-    originalName: string;
-    fileSize: number;
-    imdbId: string | null;
-}): Promise<void> => {
-    let metadata, videoStream;
-    try {
-        metadata = await ffprobe(data.tempPath).catch(async () => {
-            throw new InvalidVideoFileError();
-        });
-
-        const formatName = metadata.format.format_name;
-        if (formatName?.includes('image') || formatName === 'png' || formatName === 'mjpeg') throw new InvalidVideoFileError();
-
-        videoStream = metadata.streams.find((s) => s.codec_type === 'video');
-        if (!videoStream) throw new InvalidVideoFileError();
-
-        const duration = Number(metadata.format.duration) || 0;
-        if (duration < 2) throw new InvalidVideoFileError();
-    } catch (err) {
-        await fs.unlink(data.tempPath).catch(() => {});
-        throw err;
-    }
-
-    const originalWidth = Number(videoStream.width) || 0;
-    const originalHeight = Number(videoStream.height) || 0;
-    const duration = Math.round(Number(metadata.format.duration) || 0);
-    const mimeType = getMimeTypeFromFormat(metadata.format.format_name);
-
-    // create path for movie version
-    const fileExt = path.extname(data.originalName);
-    const originalId = randomUUID();
-    const storageKey = createMovieStorageKey(data.movieId, originalId, 'index' + fileExt);
-    const finalPath = path.join(paths.storage, storageKey);
-
-    try {
-        await fs.mkdir(path.dirname(finalPath), { recursive: true });
-        await fs.rename(data.tempPath, finalPath);
-
-        // add version and set status to ready on movie
-        await db.transaction(async (tx) => {
-            await tx.insert(movieVersions).values({
-                id: originalId,
-                movieId: data.movieId,
-                width: originalWidth,
-                height: originalHeight,
-                isOriginal: true,
-                storageKey: storageKey,
-                fileSize: data.fileSize,
-                mimeType,
-                status: 'ready',
-            });
-            await tx.update(movies).set({ duration, status: 'ready' }).where(eq(movies.id, data.movieId));
-        });
-        notifyJobStatus(data.userId, 'completed', `Upload completed`, `Movie uploaded successfully`, data.movieId).catch(() => {});
-    } catch (e) {
-        await fs.unlink(finalPath).catch(() => {});
-        throw new AppError('Video could not be saved in database', { cause: e });
-    }
-
-    // Subtitles
-    if (data.imdbId) {
-        const movieHash = await computeHash(finalPath);
-        downloadSubtitles({ movieId: data.movieId, imdbId: data.imdbId, movieHash }).catch((err) => {
-            logger.error(
-                {
-                    err,
-                    movieId: data.movieId,
-                    imdbId: data.imdbId,
-                    context: 'subtitles_service',
-                },
-                'Failed to download subtitles in background'
-            );
-        });
-    }
-
-    // Resolutions
-    const tasksToRun = new Set<number>();
-
-    const sysSettings = await systemSettings.get();
-    const processingPreference = sysSettings.features.autoTranscoding;
-    if (processingPreference === 'compatibility' || processingPreference === 'smart') {
-        if (mimeType != 'video/mp4') {
-            // process original resolution if not mp4
-            tasksToRun.add(originalHeight);
-
-            const videoStream = metadata.streams.find((s) => s.codec_type === 'video');
-            const codecName = videoStream?.codec_name;
-            if (codecName === 'h265' || codecName === 'hevc') {
-                if (originalHeight > 1080) tasksToRun.add(1080);
-                else if (originalHeight > 720) tasksToRun.add(720);
-            }
-        }
-
-        if (processingPreference === 'smart') {
-            // process tasks for lower resolutions -> enable (auto) only on strong cpus
-            if (originalHeight > 1080) tasksToRun.add(1080);
-            else if (originalHeight > 720) tasksToRun.add(720);
-        }
-    }
-
-    if (tasksToRun.size > 0) startProcessing(data.movieId, Array.from(tasksToRun), paths.storage, finalPath);
 };
 
 const getOrderBy = (orderBy: string | null) => {
@@ -322,7 +125,66 @@ export const getMovies = async (options: {
     };
 };
 
-export const getMovieById = async (id: string, options: { userId: string | null } = { userId: null }): Promise<MovieDetailedDTO | null> => {
+export const deleteMovieById = async (id: string) => {
+    const movie = await db.query.movies.findFirst({
+        where: eq(movies.id, id),
+        with: { versions: true },
+    });
+
+    if (!movie) throw new MovieNotFoundError();
+
+    if (movie.status === 'processing') throw new AppError('Wait until video is processed', { statusCode: 403 });
+
+    if (movie.status === 'downloading') throw new AppError('Wait until video is downloaded', { statusCode: 403 });
+
+    for (const version of movie.versions) {
+        if (version.status === 'processing') {
+            await taskRegistry.kill(version.id).catch(() => {});
+        } else if (version.status === 'waiting') {
+            taskHandler.cancel(version.id);
+        }
+    }
+
+    const movieDir = path.resolve(paths.storage, 'movies', movie.id);
+    await fs.rm(movieDir, { recursive: true, force: true }).catch(() => {});
+    await db.delete(movies).where(eq(movies.id, id));
+};
+
+export const updateMovieById = async (id: string, data: Partial<VideoMetadata>): Promise<MovieDetailedDTO> => {
+    await db.transaction(async (tx) => {
+        const modified = await tx
+            .update(movies)
+            .set({
+                title: data.title,
+                description: data.overview,
+                releaseYear: data.releaseYear,
+                rating: data.rating?.toString() ?? null,
+                bannerUrl: data.bannerUrl,
+                posterUrl: data.posterUrl,
+            })
+            .where(eq(movies.id, id));
+
+        if (modified.rowCount === 0) throw new MovieNotFoundError();
+
+        if (data.genreIds) {
+            await tx.delete(moviesToGenres).where(eq(moviesToGenres.movieId, id));
+
+            if (data.genreIds.length > 0) {
+                const values = data.genreIds.map((genreId) => ({ movieId: id, genreId: genreId }));
+                await tx
+                    .insert(moviesToGenres)
+                    .values(values)
+                    .catch(async (err) => {
+                        throw new AppError('Database insert failed for movie genres', { statusCode: 500, cause: err });
+                    });
+            }
+        }
+    });
+
+    return getMovieById(id);
+};
+
+export const getMovieById = async (id: string, options: { userId: string | null } = { userId: null }): Promise<MovieDetailedDTO> => {
     const result = await db.query.movies.findFirst({
         where: eq(movies.id, id),
         with: {
@@ -361,7 +223,7 @@ export const getMovieById = async (id: string, options: { userId: string | null 
     const original = result.versions.find((v) => v.isOriginal);
     if (original && result.duration) {
         const livePresets = [2160, 1440, 1080, 720, 480];
-        const existingHeights = result.versions.map((v) => v.height);
+        const existingHeights = result.versions.filter((v) => v.status === 'ready').map((v) => v.height);
 
         const liveVersions: MovieVersionDTO[] = livePresets
             .filter((h) => h <= original.height && !existingHeights.includes(h))

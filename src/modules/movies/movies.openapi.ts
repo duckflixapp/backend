@@ -389,6 +389,151 @@
 
 /**
  * @openapi
+ * /movies/{id}:
+ *   delete:
+ *     summary: Delete a movie
+ *     description: |
+ *       Permanently deletes a movie, all its versions, subtitles, and associated files from storage.
+ *       Requires at least `contributor` role.
+ *     tags: [Movies]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       204:
+ *         description: Movie deleted
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *
+ * /movies/{id}/versions:
+ *   get:
+ *     summary: Get all versions of a movie
+ *     description: |
+ *       Returns all versions of a movie including original, transcoded, and versions
+ *       in any status (ready, processing, waiting, canceled, error).
+ *       Requires at least `contributor` role.
+ *     tags: [Movies]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: List of all movie versions
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: success
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     versions:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/MovieVersion'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ */
+
+/**
+ * @openapi
+ * /movies/{id}/versions:
+ *   post:
+ *     summary: Add a new version
+ *     description: |
+ *       Starts a transcoding job to create a new version of the movie at the specified height.
+ *       The height must not exceed the original version's resolution.
+ *       Returns 409 if a version at that height already exists or is being processed.
+ *       Requires at least `contributor` role.
+ *     tags: [Movies]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [height]
+ *             properties:
+ *               height:
+ *                 type: integer
+ *                 example: 1080
+ *                 description: Target resolution height in pixels
+ *     responses:
+ *       201:
+ *         description: Transcoding job started
+ *       400:
+ *         description: Height exceeds original resolution
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       409:
+ *         description: Version at this height already exists or is being processed
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *
+ * /movies/{id}/versions/{versionId}:
+ *   delete:
+ *     summary: Delete a version
+ *     description: |
+ *       Permanently deletes a movie version and its files from storage.
+ *       The original version cannot be deleted.
+ *       Requires at least `contributor` role.
+ *     tags: [Movies]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *       - in: path
+ *         name: versionId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       204:
+ *         description: Version deleted
+ *       400:
+ *         description: Cannot delete original version
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ */
+
+/**
+ * @openapi
  * /movies/{id}/watch:
  *   post:
  *     summary: Record watch start

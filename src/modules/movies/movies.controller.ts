@@ -4,9 +4,11 @@ import * as GenresService from './services/genres.service';
 import * as MetadataService from './services/metadata.service';
 import { catchAsync } from '../../shared/utils/catchAsync';
 import { AppError } from '../../shared/errors';
-import { createMovieSchema, movieParamsSchema, movieQuerySchema } from './validators/movies.validator';
+import { createMovieSchema, movieParamsSchema, movieQuerySchema, updateMovieSchema } from './validators/movies.validator';
 import { handleWorkflowError } from './movies.handler';
 import { createGenreSchema } from './validators/genres.validator';
+import { processVideoWorkflow } from './workflows/video.workflow';
+import { processTorrentFileWorkflow } from './workflows/torrent.workflow';
 
 export const upload = catchAsync(async (req: Request, res: Response) => {
     const validatedData = createMovieSchema.parse(req.body);
@@ -25,7 +27,7 @@ export const upload = catchAsync(async (req: Request, res: Response) => {
     });
 
     if (videoFile)
-        MoviesService.processMovieWorkflow({
+        processVideoWorkflow({
             userId: req.user!.id,
             movieId: movie.id,
             imdbId: metadata.imdbId,
@@ -34,7 +36,7 @@ export const upload = catchAsync(async (req: Request, res: Response) => {
             fileSize: videoFile.size,
         }).catch((e) => handleWorkflowError(movie.id, e, 'movie'));
     else if (torrentFile?.path) {
-        MoviesService.processTorrentFileWorkflow({
+        processTorrentFileWorkflow({
             userId: req.user!.id,
             movieId: movie.id,
             imdbId: metadata.imdbId,
@@ -82,6 +84,30 @@ export const getOne = catchAsync(async (req: Request, res: Response) => {
     res.status(200).json({
         status: 'success',
         data: { movie: movieDto },
+    });
+});
+
+export const deleteOne = catchAsync(async (req: Request, res: Response) => {
+    const { id } = movieParamsSchema.parse(req.params);
+
+    await MoviesService.deleteMovieById(id);
+
+    res.status(204).json({
+        status: 'success',
+    });
+});
+
+export const updateOne = catchAsync(async (req: Request, res: Response) => {
+    const { id } = movieParamsSchema.parse(req.params);
+    const validatedData = updateMovieSchema.parse(req.body);
+
+    const metadata = await MetadataService.enrichUpdateMetadata(validatedData.dbUrl, validatedData);
+
+    const movie = await MoviesService.updateMovieById(id, metadata);
+
+    res.status(200).json({
+        status: 'success',
+        data: { movie },
     });
 });
 

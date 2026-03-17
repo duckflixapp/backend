@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import * as MoviesController from './movies.controller';
+import * as MoviesVersionsController from './versions.controller';
 import { movieUpload } from '../../shared/configs/multer.config';
 import { limiterConfigs } from '../../shared/limiters';
 import rateLimit from 'express-rate-limit';
@@ -22,6 +23,7 @@ router.post(
     ]),
     MoviesController.upload
 );
+
 router.get(
     '/',
     rateLimit({
@@ -75,6 +77,66 @@ router.get(
         keyGenerator: limiterConfigs.authenticatedKey,
     }),
     MoviesController.getOne
+);
+
+router.delete(
+    '/:id',
+    hasRole('contributor'),
+    rateLimit({
+        ...limiterConfigs.defaults(),
+        windowMs: 2 * 1000, // 30 per 2s
+        limit: 30,
+        keyGenerator: limiterConfigs.authenticatedKey,
+    }),
+    MoviesController.deleteOne
+);
+
+router.patch(
+    '/:id',
+    hasRole('contributor'),
+    rateLimit({
+        ...limiterConfigs.defaults(),
+        windowMs: 2 * 1000, // 30 per 2s
+        limit: 30,
+        keyGenerator: limiterConfigs.authenticatedKey,
+    }),
+    MoviesController.updateOne
+);
+
+router.get(
+    '/:id/versions/',
+    hasRole('contributor'),
+    rateLimit({
+        ...limiterConfigs.defaults(),
+        windowMs: 2 * 1000, // 30 per 2s
+        limit: 30,
+        keyGenerator: limiterConfigs.authenticatedKey,
+    }),
+    MoviesVersionsController.getMany
+);
+
+router.post(
+    '/:id/versions',
+    hasRole('contributor'),
+    rateLimit({
+        ...limiterConfigs.defaults(),
+        windowMs: 2 * 1000, // 30 per 2s
+        limit: 30,
+        keyGenerator: limiterConfigs.authenticatedKey,
+    }),
+    MoviesVersionsController.addVersion
+);
+
+router.delete(
+    '/:id/versions/:versionId',
+    hasRole('contributor'),
+    rateLimit({
+        ...limiterConfigs.defaults(),
+        windowMs: 2 * 1000, // 30 per 2s
+        limit: 30,
+        keyGenerator: limiterConfigs.authenticatedKey,
+    }),
+    MoviesVersionsController.deleteVersion
 );
 
 router.post(

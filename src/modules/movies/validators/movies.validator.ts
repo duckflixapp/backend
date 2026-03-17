@@ -43,6 +43,26 @@ export const createMovieSchema = z
         }
     );
 
+export const updateMovieSchema = z.object({
+    dbUrl: z.url('Invalid DB URL').max(1000).optional().nullable(),
+    title: z.string().min(1).max(255).optional().nullable(),
+    overview: z.string().max(1000).optional().nullable(),
+    releaseYear: z.coerce
+        .number()
+        .int()
+        .min(1888)
+        .max(new Date().getFullYear() + 5)
+        .optional()
+        .nullable(),
+    bannerUrl: z.url().max(1000).optional().nullable(),
+    posterUrl: z.url().max(1000).optional().nullable(),
+    genreIds: z.preprocess((val) => (typeof val === 'string' ? [val] : val), z.array(z.uuid()).max(10)).optional(),
+});
+
+export const addVersionSchema = z.object({
+    height: z.number().int().positive(),
+});
+
 export const movieQuerySchema = z.object({
     page: z.coerce.number().int().positive().max(10000, 'Page limit exceeded').default(1),
     limit: z.coerce.number().int().positive().max(100).default(20),
@@ -55,5 +75,10 @@ export const movieParamsSchema = z.object({
     id: z.uuid('Invalid movie ID format'),
 });
 
+export const movieVersionParamsSchema = movieParamsSchema.extend({
+    versionId: z.uuid('Invalid movie version ID format'),
+});
+
 export type CreateMovieInput = z.infer<typeof createMovieSchema>;
+export type UpdateMovieInput = z.infer<typeof updateMovieSchema>;
 export type MovieQueryInput = z.infer<typeof movieQuerySchema>;
