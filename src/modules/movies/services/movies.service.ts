@@ -255,7 +255,7 @@ const getOrderBy = (orderBy: string | null) => {
         case 'oldest':
             return [asc(movies.createdAt)];
         case 'rating':
-            return [desc(sql`cast(${movies.rating} as decimal)`), desc(movies.createdAt)];
+            return [sql`cast(${movies.rating} as decimal) DESC NULLS LAST`, desc(movies.createdAt)];
         case 'title':
             return [asc(movies.title)];
         case 'newest':
