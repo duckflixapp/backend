@@ -32,7 +32,8 @@ export const hasRole = (role: UserRole) => {
 
 export const authenticate = (verified: boolean = true) => {
     return catchAsync(async (req: Request, res: Response, next: NextFunction) => {
-        const token = req.cookies.auth_token || req.headers.authorization?.split(' ')[1];
+        const authHeader = req.headers.authorization;
+        const token = req.cookies.auth_token ?? (authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined);
 
         if (!token) throw new UnauthorizedError('No token provided');
 

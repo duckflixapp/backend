@@ -13,6 +13,47 @@ const healthLimiter = rateLimit({
     message: 'Health check rate limit exceeded',
 });
 
+/**
+ * @openapi
+ * /health:
+ *   get:
+ *     summary: Check API health
+ *     tags: [System]
+ *     security: []
+ *     responses:
+ *       200:
+ *         description: Service is healthy
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: healthy
+ *                 uptime:
+ *                   type: string
+ *                   example: 123s
+ *                 timestamp:
+ *                   type: string
+ *                   format: date-time
+ *                 version:
+ *                   type: string
+ *                   example: 0.1.0
+ *       503:
+ *         description: Service is unhealthy
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: unhealthy
+ *                 reason:
+ *                   type: string
+ *                   example: Database connection failed
+ */
 router.get('/', healthLimiter, async (_req, res) => {
     try {
         await db.execute(sql`SELECT 1`);

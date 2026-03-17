@@ -6,6 +6,8 @@ import { env } from './env';
 import { httpLogger } from './shared/configs/logger';
 import { helmetConfiguration } from './shared/configs/helmet';
 import { corsConfiguration } from './shared/configs/cors';
+import swaggerUi from 'swagger-ui-express';
+import { swaggerDoc } from './shared/configs/swagger';
 
 const app = express();
 
@@ -14,6 +16,10 @@ app.use(httpLogger);
 
 app.use(helmetConfiguration);
 app.use(corsConfiguration);
+
+if (env.NODE_ENV !== 'production') {
+    app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDoc));
+}
 
 app.use(express.json());
 app.use(cookieParser());
