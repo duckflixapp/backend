@@ -10,6 +10,13 @@ export interface FFprobeStream {
     height?: number;
     duration?: string;
     bit_rate?: string;
+    tags: FFProbeStreamTags;
+}
+
+export interface FFProbeStreamTags {
+    language?: string;
+    title?: string;
+    [key: string]: string | undefined;
 }
 
 export interface FFprobeFormat {

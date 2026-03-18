@@ -5,11 +5,107 @@ import { mapSubtitles, subtitlesClient } from '../services/subs.service';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import fs from 'node:fs/promises';
-import { convertSRTtoVTT } from '../../../shared/utils/ffmpeg';
+import { convertSRTtoVTT, extractSubtitleStream } from '../../../shared/utils/ffmpeg';
 import { db } from '../../../shared/configs/db';
 import { subtitles } from '../../../shared/schema';
 import { AppError } from '../../../shared/errors';
 import { logger } from '../../../shared/configs/logger';
+import type { FFprobeData } from '../../../shared/video/src/probe';
+import { normalizeLanguage } from '../../../shared/utils/subs';
+
+const SUPPORTED_SUB_CODECS = [
+    'subrip', // SRT
+    'ass', // ASS/SSA
+    'ssa',
+    'webvtt', // VTT
+    'mov_text', // MP4 text
+    'text',
+];
+
+const SKIP_SUB_CODECS = [
+    'hdmv_pgs_subtitle', // Blu-ray image based
+    'dvd_subtitle', // DVD VOB sub image based
+    'dvb_teletext',
+];
+
+export const extractSubtitlesWorkflow = async (data: { filePath: string; movieId: string; metadata: FFprobeData }) => {
+    const subStreams = data.metadata.streams.filter((s) => s.codec_type === 'subtitle');
+
+    if (subStreams.length === 0) {
+        logger.debug({ movieId: data.movieId }, '[ExtractSubtitlesWorkflow] No subtitles found');
+        return;
+    }
+
+    const imageBasedSubs = subStreams.filter((s) => SKIP_SUB_CODECS.includes(s.codec_name ?? ''));
+    if (imageBasedSubs.length > 0) {
+        logger.debug(
+            {
+                movieId: data.movieId,
+                count: imageBasedSubs.length,
+            },
+            '[ExtractSubtitlesWorkflow] Image-based subtitles skipped'
+        );
+    }
+
+    const textBasedSubs = subStreams.filter((s) => SUPPORTED_SUB_CODECS.includes(s.codec_name ?? ''));
+    logger.debug(
+        {
+            movieId: data.movieId,
+            count: textBasedSubs.length,
+        },
+        '[ExtractSubtitlesWorkflow] Found text based subs'
+    );
+
+    for (const stream of textBasedSubs) {
+        const language = normalizeLanguage(stream.tags.language);
+        if (!language) continue;
+
+        try {
+            const storageKey = `subtitles/${randomUUID()}.vtt`;
+            const finalPath = path.join(paths.storage, storageKey);
+            await fs.mkdir(path.dirname(finalPath), { recursive: true });
+
+            await extractSubtitleStream({
+                inputPath: data.filePath,
+                outputPath: finalPath,
+                streamIndex: stream.index,
+                codec: stream.codec_name ?? '',
+            });
+
+            const stats = await fs.stat(finalPath);
+            // check if not empty
+            if (stats.size < 10) {
+                await fs.unlink(finalPath).catch(() => {});
+                continue;
+            }
+
+            await db
+                .insert(subtitles)
+                .values({ movieId: data.movieId, language: language, externalId: null, storageKey })
+                .catch(async (err) => {
+                    await fs.unlink(finalPath).catch(() => {});
+                    throw new AppError('Database insert failed for subtitle', { cause: err });
+                });
+
+            logger.info(
+                {
+                    movieId: data.movieId,
+                    language: language,
+                    storageKey,
+                },
+                '[ExtractSubtitlesWorkflow] Subtitle processed and saved successfully'
+            );
+        } catch (err) {
+            const log = {
+                err,
+                movieId: data.movieId,
+                language: language,
+            };
+            if (err instanceof AppError) logger.warn(log, `[ExtractSubtitlesWorkflow] ${err.message}`);
+            else logger.error(log, 'Critical Error processing subtitle');
+        }
+    }
+};
 
 export const downloadSubtitlesWorkflow = async (data: { movieId: string; imdbId: string; movieHash?: string }) => {
     const sysSettings = await systemSettings.get();

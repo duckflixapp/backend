@@ -27,3 +27,15 @@ export const convertSRTtoVTT = async (stream: ReadableStream | null, outputPath:
         throw new SubtitleConversionError(`FFmpeg failed (code ${exitCode})`, errorOutput);
     }
 };
+
+export const extractSubtitleStream = async (opts: { inputPath: string; streamIndex: number; outputPath: string; codec: string }) => {
+    const proc = Bun.spawn(['ffmpeg', '-i', opts.inputPath, '-map', `0:${opts.streamIndex}`, '-c:s', 'webvtt', '-y', opts.outputPath], {
+        stderr: 'pipe',
+    });
+
+    await proc.exited;
+
+    if (proc.exitCode !== 0) {
+        throw new Error(`FFmpeg subtitle extraction failed with code ${proc.exitCode}`);
+    }
+};

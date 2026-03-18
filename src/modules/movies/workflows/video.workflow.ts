@@ -14,7 +14,7 @@ import { notifyJobStatus } from '../../../shared/services/notification.service';
 import { computeHash } from '../services/subs.service';
 import { systemSettings } from '../../../shared/services/system.service';
 import { logger } from '../../../shared/configs/logger';
-import { downloadSubtitlesWorkflow } from './subtitles.workflow';
+import { downloadSubtitlesWorkflow, extractSubtitlesWorkflow } from './subtitles.workflow';
 
 export const processVideoWorkflow = async (data: {
     userId: string;
@@ -80,6 +80,9 @@ export const processVideoWorkflow = async (data: {
     }
 
     // Subtitles
+    await extractSubtitlesWorkflow({ filePath: finalPath, movieId: data.movieId, metadata });
+
+    // - External
     if (data.imdbId) {
         const movieHash = await computeHash(finalPath);
         downloadSubtitlesWorkflow({ movieId: data.movieId, imdbId: data.imdbId, movieHash }).catch((err) => {
