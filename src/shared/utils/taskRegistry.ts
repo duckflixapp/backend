@@ -37,7 +37,7 @@ export class TaskRegistry {
         this.pauseRef -= 1;
         if (this.pauseRef !== 0) return;
 
-        const promises = Array.from(this.activeJobs.keys()).map(this.resume);
+        const promises = Array.from(this.activeJobs.keys()).map((id) => this.resume(id));
         await Promise.all(promises);
     }
 

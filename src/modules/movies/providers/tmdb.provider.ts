@@ -35,7 +35,7 @@ export const fillFromIMDBId = async (imdbId: string) => {
     return fillFromTMDBId(String(movie.id));
 };
 
-export const fillFromTMDBId = async (id: string): Promise<Partial<VideoMetadata>> => {
+export const fillFromTMDBId = async (id: string): Promise<VideoMetadata> => {
     const raw = await tmdbClient.getMovieDetails(id);
 
     const rawGenres = raw.genres.map(({ name }) => name.toLowerCase());
@@ -57,4 +57,16 @@ export const getTMDBGenres = async () => {
     const { genres } = await tmdbClient.getMovieGenres();
     const genreNames = genres.map(({ name }) => name.toLowerCase());
     return genreNames;
+};
+
+export const searchTMDB = async (data: {
+    title: string;
+    year?: number;
+    primary_release_year?: number;
+    language?: string;
+    adult?: boolean;
+    region?: string;
+    page?: number;
+}) => {
+    return tmdbClient.searchMovies(data.title, data);
 };

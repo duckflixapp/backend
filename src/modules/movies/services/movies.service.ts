@@ -200,6 +200,7 @@ export const getMovieById = async (id: string, options: { userId: string | null 
                     id: true,
                     name: true,
                     role: true,
+                    system: true,
                 },
             },
         },

@@ -11,9 +11,10 @@ import { getMimeTypeFromFormat } from '../../../shared/utils/ffmpeg';
 import { paths } from '../../../shared/configs/path.config';
 import { AppError } from '../../../shared/errors';
 import { notifyJobStatus } from '../../../shared/services/notification.service';
-import { computeHash, downloadSubtitles } from '../services/subs.service';
+import { computeHash } from '../services/subs.service';
 import { systemSettings } from '../../../shared/services/system.service';
 import { logger } from '../../../shared/configs/logger';
+import { downloadSubtitlesWorkflow } from './subtitles.workflow';
 
 export const processVideoWorkflow = async (data: {
     userId: string;
@@ -81,7 +82,7 @@ export const processVideoWorkflow = async (data: {
     // Subtitles
     if (data.imdbId) {
         const movieHash = await computeHash(finalPath);
-        downloadSubtitles({ movieId: data.movieId, imdbId: data.imdbId, movieHash }).catch((err) => {
+        downloadSubtitlesWorkflow({ movieId: data.movieId, imdbId: data.imdbId, movieHash }).catch((err) => {
             logger.error(
                 {
                     err,

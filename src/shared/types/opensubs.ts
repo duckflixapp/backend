@@ -10,6 +10,16 @@ export interface SubtitleFile {
     file_name: string;
 }
 
+export interface SubtitleFeatureDetails {
+    feature_id: number;
+    feature_type: 'Movie';
+    year: number;
+    title: string;
+    movie_name: string;
+    imdb_id: number;
+    tmdb_id: number;
+}
+
 export interface SubtitleData {
     id: string;
     type: string;
@@ -35,7 +45,7 @@ export interface SubtitleData {
         legacy_subtitle_id: number;
         legacy_uploader_id: number;
         uploader: SubtitleUploader;
-        feature_details: unknown;
+        feature_details: SubtitleFeatureDetails;
         url: string;
         related_links: unknown[];
         files: SubtitleFile[];

@@ -1,21 +1,13 @@
-import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
 import { OpenSubtitlesClient } from '../../../shared/lib/opensubs';
-import type { SmallSubtitleData, SubtitleData, SubtitleFile } from '../../../shared/types/opensubs';
-import { db } from '../../../shared/configs/db';
-import { subtitles, type SystemSettingsT } from '../../../shared/schema';
-import { paths } from '../../../shared/configs/path.config';
-import { randomUUID } from 'node:crypto';
-import path from 'node:path';
-import { convertSRTtoVTT } from '../../../shared/utils/ffmpeg';
-import { SubtitleDownloadError } from '../movies.errors';
-import { AppError } from '../../../shared/errors';
+import { type SystemSettingsT } from '../../../shared/schema';
 import { env } from '../../../env';
 import { systemSettings } from '../../../shared/services/system.service';
 import { logger } from '../../../shared/configs/logger';
+import type { SmallSubtitleData, SubtitleData, SubtitleFile } from '../../../shared/types/opensubs';
 
 const sysSettings = await systemSettings.get();
-const subtitlesClient = new OpenSubtitlesClient({
+export const subtitlesClient = new OpenSubtitlesClient({
     baseUrl: env.OPENSUBS_URL,
     apiKey: sysSettings.external.openSubtitles.apiKey,
     username: sysSettings.external.openSubtitles.username,
@@ -30,16 +22,9 @@ systemSettings.addListener('update', (settings: SystemSettingsT) => {
     logger.info({ context: 'external_api', service: 'opensubtitles' }, 'OpenSubtitles credentials updated successfully');
 });
 
-export const downloadSubtitles = async (data: { movieId: string; imdbId: string; movieHash?: string }) => {
-    const sysSettings = await systemSettings.get();
-    const preferences = sysSettings.preferences.subtitles;
-
-    const subs = await subtitlesClient.getSubtitles(data.imdbId, {
-        languages: preferences.map((p) => p.lang),
-        movieHash: data.movieHash,
-    });
+export const mapSubtitles = (subtitles: SubtitleData[], preferences: { lang: string; variants: number }[] = []) => {
     const languageSubtitleMap = new Map<string, SubtitleData[]>();
-    subs.forEach((sub) => {
+    subtitles.forEach((sub) => {
         const key = sub.attributes.language;
         const arr = languageSubtitleMap.get(key) ?? [];
         arr.push(sub);
@@ -49,10 +34,11 @@ export const downloadSubtitles = async (data: { movieId: string; imdbId: string;
     const subtitlesArr: SmallSubtitleData[] = [];
     languageSubtitleMap.keys().forEach((key) => {
         const subs = languageSubtitleMap.get(key)!;
+        const p = preferences.find((p) => p.lang === key);
         const sliced = subs
             .filter((s) => s.attributes.files.length > 0)
             .sort((a, b) => b.attributes.ratings - a.attributes.ratings)
-            .slice(0, preferences.find((p) => p.lang === key)!.variants);
+            .slice(0, p?.variants ?? undefined);
         subtitlesArr.push(
             ...sliced.map((s) => ({
                 id: s.id,
@@ -63,49 +49,7 @@ export const downloadSubtitles = async (data: { movieId: string; imdbId: string;
         );
     });
 
-    for (const subtitle of subtitlesArr) {
-        if (subtitle.files.length < 1) continue;
-        try {
-            const file = subtitle.files[0]!;
-            const { link } = await subtitlesClient.downloadSubtitle(file.file_id, { sub_format: 'srt' }).catch((err) => {
-                throw new SubtitleDownloadError('OpenSubs link failed', err);
-            });
-
-            const storageKey = `subtitles/${randomUUID()}.vtt`;
-            const finalPath = path.join(paths.storage, storageKey);
-            await fs.mkdir(path.dirname(finalPath), { recursive: true });
-
-            const response = await fetch(link);
-            if (!response.ok) throw new SubtitleDownloadError(`Source file fetch failed: ${response.statusText}`);
-            await convertSRTtoVTT(response.body, finalPath);
-
-            await db
-                .insert(subtitles)
-                .values({ movieId: data.movieId, language: subtitle.language, externalId: subtitle.id, storageKey })
-                .catch(async (err) => {
-                    await fs.unlink(finalPath).catch(() => {});
-                    throw new AppError('Database insert failed for subtitle', { cause: err });
-                });
-
-            logger.info(
-                {
-                    movieId: data.movieId,
-                    language: subtitle.language,
-                    storageKey,
-                },
-                'Subtitle processed and saved successfully'
-            );
-        } catch (err) {
-            const log = {
-                err,
-                movieId: data.movieId,
-                language: subtitle.language,
-                externalId: subtitle.id,
-            };
-            if (err instanceof AppError) logger.warn(log, `[Subtitle Skip] ${err.message}`);
-            else logger.error(log, 'Critical Error processing subtitle');
-        }
-    }
+    return subtitlesArr;
 };
 
 export const computeHash = async (filePath: string) => {

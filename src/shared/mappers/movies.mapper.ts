@@ -50,7 +50,7 @@ export const toMovieDetailedDTO = (
     movie: Movie & {
         genres: { genre: Genre }[];
         versions: MovieVersion[];
-        uploader: { id: string; name: string; role: UserRole } | null;
+        uploader: { id: string; name: string; role: UserRole; system: boolean } | null;
         subtitles: Subtitle[];
     },
     inUserLibrary?: boolean | null

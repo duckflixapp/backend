@@ -51,6 +51,7 @@ export const users = pgTable('users', {
     verified_email: boolean('is_verified_email').notNull().default(false),
     password: text('password').notNull(),
     role: text('role').$type<UserRole>().default('watcher').notNull(),
+    system: boolean('system').default(false).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' }).notNull().defaultNow(),
 });
 

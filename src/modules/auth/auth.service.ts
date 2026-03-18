@@ -32,7 +32,7 @@ export const register = async (name: string, email: string, pass: string): Promi
     const verificationToken = crypto.randomBytes(32).toString('hex');
 
     const user = await db.transaction(async (tx) => {
-        const existingUser = await tx.select({ id: users.id }).from(users).limit(1);
+        const existingUser = await tx.select({ id: users.id }).from(users).where(eq(users.system, false)).limit(1);
 
         const [user] = await tx
             .insert(users)
@@ -100,7 +100,7 @@ export const login = async (
     pass: string,
     context: { ip?: string; userAgent?: string }
 ): Promise<{ token: string; refreshToken: string; user: UserDTO }> => {
-    const user = await db.query.users.findFirst({ where: eq(users.email, email) });
+    const user = await db.query.users.findFirst({ where: and(eq(users.email, email), eq(users.system, false)) });
 
     if (!user) throw new InvalidCredentialsError();
 

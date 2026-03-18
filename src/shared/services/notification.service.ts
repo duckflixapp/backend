@@ -1,13 +1,15 @@
 import { db } from '../configs/db';
-import { notifications } from '../schema';
+import { notifications, users } from '../schema';
 import { io } from '../../server';
 import { logger } from '../configs/logger';
+import { and, eq } from 'drizzle-orm';
+import { getSystemUserId } from '../configs/system';
 
 const notifyUser = (userId: string, data: unknown) => {
     io.to(`user:${userId}`).emit('notification', data);
 };
 
-const notifyJobStatus = async (
+export const notifyJobStatus = async (
     userId: string,
     status: 'started' | 'completed' | 'downloaded' | 'canceled' | 'error',
     title: string,
@@ -25,17 +27,30 @@ const notifyJobStatus = async (
 
     const finalType = typeMap[status] || 'info';
 
-    db.insert(notifications)
-        .values({
-            userId: userId,
-            movieId: movieId,
-            movieVerId: movieVerId,
-            type: finalType,
-            title,
-            message,
-        })
-        .catch((err) => logger.error({ err, userId, movieId, status }, 'Failed to save notification to database'));
-    notifyUser(userId, { movieId, movieVerId, status, title, message });
-};
+    const isSystem = userId === getSystemUserId();
+    const targetIds: string[] = [];
 
-export { notifyJobStatus };
+    if (isSystem) {
+        const admins = await db
+            .select({ id: users.id })
+            .from(users)
+            .where(and(eq(users.role, 'admin'), eq(users.system, false)));
+        targetIds.push(...admins.map((a) => a.id));
+    } else targetIds.push(userId);
+
+    const values = targetIds.map((id) => ({
+        userId: id,
+        movieId: movieId,
+        movieVerId: movieVerId,
+        type: finalType,
+        title,
+        message,
+    }));
+
+    await db
+        .insert(notifications)
+        .values(values)
+        .catch((err) => logger.error({ err, userId, movieId, status }, 'Failed to save notification to database'));
+
+    targetIds.forEach((id) => notifyUser(id, { movieId, movieVerId, status, title, message }));
+};

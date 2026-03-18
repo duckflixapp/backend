@@ -3,7 +3,7 @@ import type { Library, LibraryItem, Movie, User } from '../schema';
 import { toUserMinDTO } from './user.mapper';
 import { toMovieMinDTO } from './movies.mapper';
 
-export const toLibraryDTO = (library: Library & { user: Pick<User, 'id' | 'name' | 'role'> }): LibraryDTO => ({
+export const toLibraryDTO = (library: Library & { user: Pick<User, 'id' | 'name' | 'role' | 'system'> }): LibraryDTO => ({
     ...toLibraryMinDTO(library),
     user: toUserMinDTO(library.user),
 });

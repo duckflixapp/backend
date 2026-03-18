@@ -70,8 +70,8 @@ export class OpenSubtitlesClient {
     }
 
     public async getSubtitles(
-        imdbId: string,
         options?: {
+            imdbId?: string;
             languages?: string[];
             movieHash?: string;
             page?: number;
@@ -86,7 +86,7 @@ export class OpenSubtitlesClient {
                     type: 'movie',
                     order_by: 'ratings',
                     order_direction: 'desc',
-                    imdb_id: imdbId,
+                    imdb_id: options?.imdbId,
                     languages: languagesString,
                     moviehash: options?.movieHash,
                     moviehash_match: options?.movieHash ? 'only' : undefined,
@@ -98,7 +98,7 @@ export class OpenSubtitlesClient {
             });
         const results = data.data;
         if (further > 0 && data.page < data.total_pages) {
-            const furtherData = await this.getSubtitles(imdbId, { ...options, page: data.page + 1 }, further - 1).catch(() => []);
+            const furtherData = await this.getSubtitles({ ...options, page: data.page + 1 }, further - 1).catch(() => []);
             results.push(...furtherData);
         }
         return results;
