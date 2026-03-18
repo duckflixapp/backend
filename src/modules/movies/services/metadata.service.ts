@@ -1,5 +1,6 @@
 import { AppError } from '../../../shared/errors';
-import { fillFromTMDBUrl } from '../providers/tmdb.provider';
+import { parseIdFromUrl } from '../providers/imdb.provider';
+import { fillFromIMDBId, fillFromTMDBUrl } from '../providers/tmdb.provider';
 import { isVideoMetadata } from '../validators/metadata.validator';
 import type { CreateMovieInput, UpdateMovieInput } from '../validators/movies.validator';
 
@@ -16,6 +17,10 @@ export interface VideoMetadata {
 
 export const fillFromUrl = async (url: string): Promise<Partial<VideoMetadata> | null> => {
     if (url.includes('themoviedb.org/movie')) return await fillFromTMDBUrl(url);
+    if (url.includes('imdb.com/title')) {
+        const imdbId = parseIdFromUrl(url);
+        return await fillFromIMDBId(imdbId);
+    }
     return null;
 };
 

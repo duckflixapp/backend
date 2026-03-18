@@ -1,10 +1,16 @@
 import axios from 'axios';
-import type { TMDBMovieDetails } from '../types/tmdb';
+import type { TMDBFindByExternalIdResponse, TMDBMovieDetails } from '../types/tmdb';
 import { AppError } from '../errors';
 
 export class TMDBMovieDetailsError extends AppError {
     constructor(err: unknown) {
         super('Could not fetch TMDB Movies API', { statusCode: 500, cause: err });
+    }
+}
+
+export class TMDBFindExternalError extends AppError {
+    constructor(err: unknown) {
+        super('Could not fetch TMDB Find API', { statusCode: 500, cause: err });
     }
 }
 
@@ -39,6 +45,20 @@ export class TMDBClient {
         const { data } = await this.api.get<TMDBMovieDetails>(`/movie/${movieId}`).catch((err) => {
             throw new TMDBMovieDetailsError(err);
         });
+        return data;
+    }
+
+    public async findByExternalId(externalId: string, source: 'imdb_id', language: string = 'en-US') {
+        const { data } = await this.api
+            .get<TMDBFindByExternalIdResponse>(`/find/${externalId}`, {
+                params: {
+                    external_source: source,
+                    language,
+                },
+            })
+            .catch((err) => {
+                throw new TMDBFindExternalError(err);
+            });
         return data;
     }
 

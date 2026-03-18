@@ -15,16 +15,27 @@ systemSettings.addListener('update', (settings: SystemSettingsT) => {
     logger.info({ context: 'external_api', service: 'tmdb' }, 'TMDB API Key updated successfully without restart');
 });
 
-const parseIdFromUrl = (url: string): string | null => {
+const parseIdFromUrl = (url: string): string => {
     const movieMatch = url.match(/themoviedb\.org\/movie\/(\d+)/);
-    if (movieMatch) return movieMatch[1] ?? null;
-    return null;
+    if (movieMatch && movieMatch[1]) return movieMatch[1];
+    throw new AppError('Invalid TMDB URL', { statusCode: 400 });
 };
 
-export const fillFromTMDBUrl = async (url: string): Promise<Partial<VideoMetadata>> => {
+export const fillFromTMDBUrl = async (url: string) => {
     const id = parseIdFromUrl(url);
-    if (!id) throw new AppError('Invalid tmdb url', { statusCode: 400 });
 
+    return fillFromTMDBId(id);
+};
+
+export const fillFromIMDBId = async (imdbId: string) => {
+    const response = await tmdbClient.findByExternalId(imdbId, 'imdb_id');
+    const movie = response.movie_results[0];
+    if (!movie || !movie.id) throw new AppError('TMDB Movie not found', { statusCode: 404 });
+
+    return fillFromTMDBId(String(movie.id));
+};
+
+export const fillFromTMDBId = async (id: string): Promise<Partial<VideoMetadata>> => {
     const raw = await tmdbClient.getMovieDetails(id);
 
     const rawGenres = raw.genres.map(({ name }) => name.toLowerCase());
