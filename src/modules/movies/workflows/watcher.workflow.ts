@@ -6,8 +6,9 @@ import fs from 'node:fs/promises';
 import { logger } from '../../../shared/configs/logger';
 import { paths } from '../../../shared/configs/path.config';
 import chokidar from 'chokidar';
-import { InvalidVideoFileError } from '../movies.errors';
+import { handleWorkflowError } from '../movies.handler';
 import { notifyJobStatus } from '../../../shared/services/notification.service';
+import { AppError } from '../../../shared/errors';
 
 export const processWatcherWorkflow = async (data: { filePath: string; fileName: string; fileSize: number }, systemUserId: string) => {
     const metadata = await identifyMovieWorkflow({ filePath: data.filePath });
@@ -26,7 +27,7 @@ export const processWatcherWorkflow = async (data: { filePath: string; fileName:
         originalName: data.fileName,
         fileSize: data.fileSize,
         imdbId: metadata.imdbId,
-    });
+    }).catch((e) => handleWorkflowError(movie.id, e, 'movie'));
 };
 
 const SUPPORTED_EXTENSIONS = ['.mkv', '.mp4', '.avi', '.mov', '.m4v'];
@@ -56,15 +57,11 @@ export const initializeWatcher = async (systemUserId: string) => {
             const fileName = path.basename(filePath);
             const fileSize = stats.size;
 
-            await processWatcherWorkflow({ filePath, fileName, fileSize }, systemUserId).catch((err) => {
-                if (err instanceof InvalidVideoFileError) {
-                    notifyJobStatus(systemUserId, 'error', 'Dropped video error', err.message);
-                    logger.debug({ fileName }, '[Watcher] Video file is invalid');
-                    return;
-                }
-                throw err;
-            });
+            await processWatcherWorkflow({ filePath, fileName, fileSize }, systemUserId);
         } catch (err) {
+            let message = '';
+            if (err instanceof AppError) message = err.message;
+            notifyJobStatus(systemUserId, 'error', 'Dropped video error', message);
             logger.error({ filePath, err }, 'Drop folder: workflow failed');
         }
     });
