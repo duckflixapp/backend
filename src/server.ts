@@ -3,7 +3,7 @@ import { app } from './app';
 import { pool } from './shared/configs/db';
 import { SocketServer } from './shared/lib/socket';
 import { env } from './env';
-import { initalize } from './initialize';
+import { initalize } from './modules/initialize/initialize';
 import { logger } from './shared/configs/logger';
 import { sessionRegistry } from './modules/media/live.service';
 
