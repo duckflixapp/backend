@@ -1,7 +1,7 @@
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { db } from '../../shared/configs/db';
-import { movieVersions, type MovieVersion, type NewMovieVersion } from '../../shared/schema';
+import { videoVersions, type VideoVersion, type NewVideoVersion } from '../../shared/schema';
 import { VideoJob, type JobType } from '../../shared/video';
 import { ffprobe } from '../../shared/video';
 import { randomUUID } from 'node:crypto';
@@ -19,7 +19,7 @@ taskHandler.addListener('completed', (taskId) => handleMovieTask(taskId, 'comple
 taskHandler.addListener('canceled', (taskId) => handleMovieTask(taskId, 'canceled'));
 taskHandler.addListener('error', (taskId, e) => handleProcessingError(taskId, e, 'task')); // this should be already catched in func handleVideoProcess
 
-const handleVideoProcess = (movieVer: MovieVersion, originalPath: string, outputPath: string) => {
+const handleVideoProcess = (movieVer: VideoVersion, originalPath: string, outputPath: string) => {
     const runnable = () =>
         processTask(movieVer, originalPath, outputPath).catch((e) => {
             handleProcessingError(movieVer.id, e, 'transcode');
@@ -31,7 +31,7 @@ const handleVideoProcess = (movieVer: MovieVersion, originalPath: string, output
 
 export const startProcessing = async (movieId: string, tasksToRun: number[], storageFolder: string, originalPath: string) => {
     // insert tasks into db
-    const tasksVersions = tasksToRun.map<NewMovieVersion>((height) => {
+    const tasksVersions = tasksToRun.map<NewVideoVersion>((height) => {
         const versionId = randomUUID();
         const storageKey = createMovieStorageKey(movieId, versionId, 'index.m3u8');
         return {
@@ -46,8 +46,8 @@ export const startProcessing = async (movieId: string, tasksToRun: number[], sto
             status: 'waiting' as const,
         };
     });
-    const waitingTasks: MovieVersion[] = await db
-        .insert(movieVersions)
+    const waitingTasks: VideoVersion[] = await db
+        .insert(videoVersions)
         .values(tasksVersions)
         .returning()
         .catch(async (err) => {
@@ -57,11 +57,11 @@ export const startProcessing = async (movieId: string, tasksToRun: number[], sto
     waitingTasks.forEach((task) => handleVideoProcess(task, originalPath, path.join(storageFolder, task.storageKey)));
 };
 
-const processTask = async (task: MovieVersion, originalPath: string, outputPath: string): Promise<number> => {
+const processTask = async (task: VideoVersion, originalPath: string, outputPath: string): Promise<number> => {
     const dirPath = path.dirname(outputPath);
     try {
         await fs.mkdir(dirPath, { recursive: true });
-        await db.update(movieVersions).set({ status: 'processing' }).where(eq(movieVersions.id, task.id));
+        await db.update(videoVersions).set({ status: 'processing' }).where(eq(videoVersions.id, task.id));
 
         try {
             await fs.access(originalPath);
@@ -107,14 +107,14 @@ const processTask = async (task: MovieVersion, originalPath: string, outputPath:
 
         // save resolution to database
         await db
-            .update(movieVersions)
+            .update(videoVersions)
             .set({
                 width: finalWidth,
                 height: task.height,
                 fileSize: totalSize,
                 status: 'ready',
             })
-            .where(eq(movieVersions.id, task.id));
+            .where(eq(videoVersions.id, task.id));
         return 0;
     } catch (error) {
         await fs.rm(dirPath, { recursive: true, force: true }).catch(() => {});

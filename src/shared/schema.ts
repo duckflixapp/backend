@@ -134,7 +134,7 @@ export const moviesToGenres = pgTable(
     (t) => [index('movie_genre_idx').on(t.movieId, t.genreId)]
 );
 
-export const movieVersions = pgTable('movie_versions', {
+export const videoVersions = pgTable('movie_versions', {
     id: uuid('id').defaultRandom().primaryKey(),
     movieId: uuid('movie_id')
         .notNull()
@@ -154,7 +154,7 @@ export const moviesRelations = relations(movies, ({ one, many }) => ({
         fields: [movies.uploaderId],
         references: [users.id],
     }),
-    versions: many(movieVersions),
+    versions: many(videoVersions),
     genres: many(moviesToGenres),
     subtitles: many(subtitles),
 }));
@@ -181,9 +181,9 @@ export const moviesToGenresRelations = relations(moviesToGenres, ({ one }) => ({
     }),
 }));
 
-export const movieVersionsRelations = relations(movieVersions, ({ one }) => ({
+export const videoVersionsRelations = relations(videoVersions, ({ one }) => ({
     movie: one(movies, {
-        fields: [movieVersions.movieId],
+        fields: [videoVersions.movieId],
         references: [movies.id],
     }),
 }));
@@ -192,7 +192,7 @@ export const notifications = pgTable('notifications', {
     id: uuid('id').defaultRandom().primaryKey(),
     userId: uuid('user_id'),
     movieId: uuid('movie_id').references(() => movies.id, { onDelete: 'cascade' }),
-    movieVerId: uuid('movie_version_id').references(() => movieVersions.id, { onDelete: 'cascade' }),
+    movieVerId: uuid('movie_version_id').references(() => videoVersions.id, { onDelete: 'cascade' }),
     type: text('type').$type<'info' | 'error' | 'success' | 'warning'>().default('info').notNull(),
     title: text('title').notNull(),
     message: text('message').notNull(),
@@ -203,10 +203,10 @@ export const notifications = pgTable('notifications', {
 export type Movie = InferSelectModel<typeof movies>;
 export type Subtitle = InferSelectModel<typeof subtitles>;
 export type Genre = InferSelectModel<typeof genres>;
-export type MovieVersion = InferSelectModel<typeof movieVersions>;
+export type VideoVersion = InferSelectModel<typeof videoVersions>;
 export type Notification = InferSelectModel<typeof notifications>;
 
-export type NewMovieVersion = typeof movieVersions.$inferInsert;
+export type NewVideoVersion = typeof videoVersions.$inferInsert;
 
 export const libraries = pgTable(
     'library',

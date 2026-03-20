@@ -2,8 +2,13 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '../../shared/configs/db';
 import { users } from '../../shared/schema';
 import { toUserDTO } from '../../shared/mappers/user.mapper';
-import { isAtLeast, roleHierarchy, roles, type UserDTO, type UserRole } from '@duckflix/shared';
+import { isAtLeast, roleHierarchy, roles, type SystemStatisticsDTO, type UserDTO, type UserRole } from '@duckflix/shared';
 import { AppError } from '../../shared/errors';
+import { getStorageStatistics } from '../../shared/services/storage.service';
+import { toSystemStatisticsDTO } from '../../shared/mappers/system.mapper';
+import { env } from '../../env';
+import { sessionRegistry } from '../media/live.service';
+import { taskHandler } from '../../shared/utils/taskHandler';
 
 export const getUsersWithRoles = async (): Promise<UserDTO[]> => {
     const rolesIncluded = roles.filter((r) => isAtLeast(r, 'watcher'));
@@ -39,4 +44,21 @@ export const deleteUser = async (email: string, context: { userId: string }): Pr
 
         await tx.delete(users).where(eq(users.id, user.id));
     });
+};
+
+export const getSystemStatistics = async (): Promise<SystemStatisticsDTO> => {
+    const storageStats = await getStorageStatistics();
+    const version = env.VERSION;
+    const uptime = process.uptime();
+
+    const sessions = {
+        total: sessionRegistry.size,
+    };
+
+    const tasks = {
+        working: taskHandler.working,
+        queue: taskHandler.queueSize,
+    };
+
+    return toSystemStatisticsDTO({ version, uptime, sessions, tasks, storage: storageStats });
 };

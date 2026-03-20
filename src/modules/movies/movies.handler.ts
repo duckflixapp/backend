@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { db } from '../../shared/configs/db';
-import { movies, movieVersions } from '../../shared/schema';
+import { movies, videoVersions } from '../../shared/schema';
 import { AppError } from '../../shared/errors';
 import { capitalize } from '../../shared/utils/string';
 import { io } from '../../server';
@@ -40,8 +40,8 @@ export const handleWorkflowError = async (movieId: string, error: unknown, conte
 
 export const handleProcessingError = async (movieVerId: string, error: unknown, context: 'transcode' | 'task') => {
     try {
-        const [updatedVersion] = await db.update(movieVersions).set({ status: 'error' }).where(eq(movieVersions.id, movieVerId)).returning({
-            movieId: movieVersions.movieId,
+        const [updatedVersion] = await db.update(videoVersions).set({ status: 'error' }).where(eq(videoVersions.id, movieVerId)).returning({
+            movieId: videoVersions.movieId,
         });
 
         if (updatedVersion?.movieId) {
@@ -76,9 +76,9 @@ export const handleProcessingError = async (movieVerId: string, error: unknown, 
 export const handleMovieTask = async (movieVerId: string, context: 'started' | 'completed' | 'canceled') => {
     try {
         const [updatedVersion] = await db
-            .select({ movieId: movieVersions.movieId })
-            .from(movieVersions)
-            .where(eq(movieVersions.id, movieVerId));
+            .select({ movieId: videoVersions.movieId })
+            .from(videoVersions)
+            .where(eq(videoVersions.id, movieVerId));
 
         if (updatedVersion?.movieId) {
             const [movieData] = await db

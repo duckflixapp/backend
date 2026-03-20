@@ -2,7 +2,7 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 import { eq } from 'drizzle-orm';
 import { db } from '../../../shared/configs/db';
-import { movies, movieVersions } from '../../../shared/schema';
+import { movies, videoVersions } from '../../../shared/schema';
 import { InvalidVideoFileError } from '../movies.errors';
 import { randomUUID } from 'node:crypto';
 import { ffprobe } from '../../../shared/video';
@@ -15,6 +15,7 @@ import { computeHash } from '../services/subs.service';
 import { systemSettings } from '../../../shared/services/system.service';
 import { logger } from '../../../shared/configs/logger';
 import { downloadSubtitlesWorkflow, extractSubtitlesWorkflow } from './subtitles.workflow';
+import { getStorageStatistics } from '../../../shared/services/storage.service';
 
 export const processVideoWorkflow = async (data: {
     userId: string;
@@ -24,11 +25,12 @@ export const processVideoWorkflow = async (data: {
     fileSize: number;
     imdbId: string | null;
 }): Promise<void> => {
-    let metadata, videoStream;
+    let metadata, fileSize, videoStream;
     try {
         metadata = await ffprobe(data.tempPath).catch(async () => {
             throw new InvalidVideoFileError();
         });
+        fileSize = data.fileSize || Number(metadata.format.size) || 0;
 
         const formatName = metadata.format.format_name;
         if (formatName?.includes('image') || formatName === 'png' || formatName === 'mjpeg') throw new InvalidVideoFileError();
@@ -38,6 +40,10 @@ export const processVideoWorkflow = async (data: {
 
         const duration = Number(metadata.format.duration) || 0;
         if (duration < 2) throw new InvalidVideoFileError();
+
+        const stats = await getStorageStatistics();
+        if (fileSize > 0 && fileSize > stats.availableBytes)
+            throw new AppError('There is not enough space in storage', { statusCode: 507 });
     } catch (err) {
         await fs.unlink(data.tempPath).catch(() => {});
         throw err;
@@ -57,17 +63,23 @@ export const processVideoWorkflow = async (data: {
     try {
         await fs.mkdir(path.dirname(finalPath), { recursive: true });
         await fs.rename(data.tempPath, finalPath);
+    } catch (e) {
+        await fs.unlink(data.tempPath).catch(() => {});
+        await fs.rm(path.join(paths.storage, 'movies', data.movieId), { recursive: true, force: true }).catch(() => {});
+        throw new AppError('Video could not be moved into storage', { cause: e });
+    }
 
+    try {
         // add version and set status to ready on movie
         await db.transaction(async (tx) => {
-            await tx.insert(movieVersions).values({
+            await tx.insert(videoVersions).values({
                 id: originalId,
                 movieId: data.movieId,
                 width: originalWidth,
                 height: originalHeight,
                 isOriginal: true,
                 storageKey: storageKey,
-                fileSize: data.fileSize,
+                fileSize,
                 mimeType,
                 status: 'ready',
             });
@@ -108,7 +120,6 @@ export const processVideoWorkflow = async (data: {
             // process original resolution if not mp4
             tasksToRun.add(originalHeight);
 
-            const videoStream = metadata.streams.find((s) => s.codec_type === 'video');
             const codecName = videoStream?.codec_name;
             if (codecName === 'h265' || codecName === 'hevc') {
                 if (originalHeight > 1080) tasksToRun.add(1080);

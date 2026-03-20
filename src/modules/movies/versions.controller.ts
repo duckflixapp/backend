@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import * as VersionService from './services/versions.service';
 import { catchAsync } from '../../shared/utils/catchAsync';
-import { addVersionSchema, movieParamsSchema, movieVersionParamsSchema } from './validators/movies.validator';
+import { addVersionSchema, movieParamsSchema, videoVersionParamsSchema } from './validators/movies.validator';
 
 export const getMany = catchAsync(async (req: Request, res: Response) => {
     const { id } = movieParamsSchema.parse(req.params);
@@ -21,7 +21,7 @@ export const addVersion = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const deleteVersion = catchAsync(async (req: Request, res: Response) => {
-    const { id, versionId } = movieVersionParamsSchema.parse(req.params);
+    const { id, versionId } = videoVersionParamsSchema.parse(req.params);
 
     await VersionService.deleteMovieVersion(id, versionId);
 

@@ -1,6 +1,6 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '../../../shared/configs/db';
-import { movies, movieVersions } from '../../../shared/schema';
+import { movies, videoVersions } from '../../../shared/schema';
 import { MovieNotFoundError, OriginalMovieVersionNotFoundError } from '../movies.errors';
 import { AppError } from '../../../shared/errors';
 import path from 'node:path';
@@ -12,8 +12,8 @@ import { taskHandler } from '../../../shared/utils/taskHandler';
 import { taskRegistry } from '../../../shared/utils/taskRegistry';
 
 export const getAllMovieVersions = async (movieId: string) => {
-    const results = await db.query.movieVersions.findMany({
-        where: eq(movieVersions.movieId, movieId),
+    const results = await db.query.videoVersions.findMany({
+        where: eq(videoVersions.movieId, movieId),
     });
 
     return results.map(toMovieVersionDTO);
@@ -24,7 +24,7 @@ export const addMovieVersion = async (movieId: string, height: number) => {
         where: eq(movies.id, movieId),
         with: {
             versions: {
-                where: and(eq(movieVersions.isOriginal, true), eq(movieVersions.status, 'ready')),
+                where: and(eq(videoVersions.isOriginal, true), eq(videoVersions.status, 'ready')),
             },
         },
     });
@@ -36,12 +36,12 @@ export const addMovieVersion = async (movieId: string, height: number) => {
 
     if (height > original.height) throw new AppError('Height exceeds original resolution', { statusCode: 400 });
 
-    const existing = await db.query.movieVersions.findFirst({
+    const existing = await db.query.videoVersions.findFirst({
         where: and(
-            eq(movieVersions.movieId, movieId),
-            eq(movieVersions.height, height),
-            eq(movieVersions.mimeType, 'application/x-mpegURL'),
-            inArray(movieVersions.status, ['ready', 'processing', 'waiting'])
+            eq(videoVersions.movieId, movieId),
+            eq(videoVersions.height, height),
+            eq(videoVersions.mimeType, 'application/x-mpegURL'),
+            inArray(videoVersions.status, ['ready', 'processing', 'waiting'])
         ),
     });
     if (existing) throw new AppError('Version already exists', { statusCode: 409 });
@@ -52,8 +52,8 @@ export const addMovieVersion = async (movieId: string, height: number) => {
 };
 
 export const deleteMovieVersion = async (movieId: string, versionId: string) => {
-    const version = await db.query.movieVersions.findFirst({
-        where: and(eq(movieVersions.id, versionId), eq(movieVersions.movieId, movieId)),
+    const version = await db.query.videoVersions.findFirst({
+        where: and(eq(videoVersions.id, versionId), eq(videoVersions.movieId, movieId)),
     });
 
     if (!version) throw new AppError('Version not found', { statusCode: 404 });
@@ -71,6 +71,6 @@ export const deleteMovieVersion = async (movieId: string, versionId: string) => 
 
     const dirPath = path.dirname(path.resolve(paths.storage, version.storageKey));
     await fs.rm(dirPath, { recursive: true, force: true }).catch(() => {});
-    await db.delete(movieVersions).where(eq(movieVersions.id, versionId));
+    await db.delete(videoVersions).where(eq(videoVersions.id, versionId));
     return sucess;
 };

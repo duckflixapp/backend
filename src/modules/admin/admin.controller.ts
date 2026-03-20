@@ -61,3 +61,12 @@ export const deleteUser = catchAsync(async (req: Request, res: Response) => {
         status: 'success',
     });
 });
+
+export const getSystemStatistics = catchAsync(async (req: Request, res: Response) => {
+    const statistics = await AdminService.getSystemStatistics();
+
+    res.status(200).json({
+        status: 'success',
+        data: { statistics },
+    });
+});

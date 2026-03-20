@@ -2,7 +2,7 @@ import type { Request, Response } from 'express';
 import path from 'node:path';
 import { eq } from 'drizzle-orm';
 import { db } from '../../shared/configs/db';
-import { movieVersions, subtitles } from '../../shared/schema';
+import { videoVersions, subtitles } from '../../shared/schema';
 import { catchAsync } from '../../shared/utils/catchAsync';
 import { AppError } from '../../shared/errors';
 import { streamParamsSchema, subtitleParamsSchema } from './media.validator';
@@ -14,7 +14,7 @@ import { logger } from '../../shared/configs/logger';
 export const stream = catchAsync(async (req: Request, res: Response) => {
     const { versionId, file } = streamParamsSchema.parse(req.params);
 
-    const version = await db.query.movieVersions.findFirst({ where: eq(movieVersions.id, versionId) });
+    const version = await db.query.videoVersions.findFirst({ where: eq(videoVersions.id, versionId) });
 
     if (!version) {
         throw new AppError('Video version not found', { statusCode: 404 });

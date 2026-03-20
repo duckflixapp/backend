@@ -1,13 +1,13 @@
 import { eq } from 'drizzle-orm';
 import { db } from '../../shared/configs/db';
-import { movieVersions } from '../../shared/schema';
+import { videoVersions } from '../../shared/schema';
 import { taskRegistry } from '../../shared/utils/taskRegistry';
 import { TaskNotFoundError } from './tasks.errors';
 import { taskHandler } from '../../shared/utils/taskHandler';
 
 export const killMovieTask = async (id: string) => {
-    const task = await db.query.movieVersions.findFirst({
-        where: eq(movieVersions.id, id),
+    const task = await db.query.videoVersions.findFirst({
+        where: eq(videoVersions.id, id),
     });
 
     if (!task) throw new TaskNotFoundError();
@@ -15,7 +15,7 @@ export const killMovieTask = async (id: string) => {
     const wasInQueue = taskHandler.cancel(id);
     const wasRunning = await taskRegistry.kill(task.id);
 
-    if (wasInQueue || wasRunning) await db.update(movieVersions).set({ status: 'canceled' }).where(eq(movieVersions.id, id));
+    if (wasInQueue || wasRunning) await db.update(videoVersions).set({ status: 'canceled' }).where(eq(videoVersions.id, id));
 
     return { wasInQueue, wasRunning };
 };

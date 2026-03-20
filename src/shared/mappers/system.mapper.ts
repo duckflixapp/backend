@@ -1,5 +1,38 @@
-import type { SystemSettingsDTO } from '@duckflix/shared';
+import type { StorageStatisticsDTO, SystemSettingsDTO, SystemStatisticsDTO } from '@duckflix/shared';
 import type { SystemSettingsT } from '../schema';
+import type { StorageStatistics } from '../services/storage.service';
+
+export const toStorageStatisticsDTO = (stats: StorageStatistics): StorageStatisticsDTO => ({
+    usedBytes: stats.usedBytes,
+    limitBytes: stats.limitBytes,
+    availableBytes: stats.availableBytes,
+    usedPercent: stats.usedPercent,
+    used: stats.used,
+    limit: stats.limit,
+    available: stats.available,
+});
+
+export const toSystemStatisticsDTO = (data: {
+    storage: StorageStatistics;
+    version: string;
+    uptime: number;
+    sessions: { total: number };
+    tasks: {
+        working: number;
+        queue: number;
+    };
+}): SystemStatisticsDTO => ({
+    version: data.version,
+    uptime: data.uptime,
+    sessions: {
+        total: data.sessions.total,
+    },
+    tasks: {
+        working: data.tasks.working,
+        queue: data.tasks.queue,
+    },
+    storage: toStorageStatisticsDTO(data.storage),
+});
 
 export const maskSecret = (value: string | undefined | null, key: boolean = true): string => {
     if (!value || value.length === 0) return '';

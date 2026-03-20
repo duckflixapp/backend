@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { movies, type Movie, type MovieVersion } from '../../shared/schema';
+import { movies, type Movie, type VideoVersion } from '../../shared/schema';
 import { db } from '../../shared/configs/db';
 import { env } from '../../env';
 import { MovieNotFoundError, NoMovieMediaFoundError, NotStandardResolutionError, TooBigResolutionError } from './live.errors';
@@ -84,7 +84,7 @@ export const generateMasterFile = async (movieId: string) => {
     return master;
 };
 
-export const getMovieWithOriginal = async (movieId: string): Promise<{ movie: Movie; original: MovieVersion }> => {
+export const getMovieWithOriginal = async (movieId: string): Promise<{ movie: Movie; original: VideoVersion }> => {
     const movie = await db.query.movies.findFirst({ where: eq(movies.id, movieId), with: { versions: true } });
     if (!movie) throw new MovieNotFoundError();
     if (!movie.duration) throw new NoMovieMediaFoundError();
@@ -97,7 +97,7 @@ export const getMovieWithOriginal = async (movieId: string): Promise<{ movie: Mo
 
 export const generateManifestFile = async (
     movie: Movie,
-    original: MovieVersion,
+    original: VideoVersion,
     height: number,
     session: string,
     options = { segmentDuration: 6 }
@@ -125,6 +125,7 @@ export const generateManifestFile = async (
 };
 
 export const sessionRegistry = new Map<string, SessionTask>();
+export const sessionRef = new Map<string, number>();
 export const ensureLiveSegment = async (movieId: string, session: string, height: number, options = { segment: 0, segmentDuration: 6 }) => {
     const original = generatedSessions.get(session);
     if (!original || original.movieId !== movieId) throw new AppError('Session not found', { statusCode: 404 });
@@ -137,12 +138,21 @@ export const ensureLiveSegment = async (movieId: string, session: string, height
     if (!sessionTask) {
         const sourcePath = path.resolve(paths.storage, original.storageKey);
         const totalSegments = Math.ceil(original.duration / options.segmentDuration);
-        sessionTask = new SessionTask(session, sourcePath, sessionPath, options.segmentDuration, height, totalSegments, () => {
+        sessionTask = new SessionTask(session, sourcePath, sessionPath, options.segmentDuration, height, totalSegments, async () => {
             sessionRegistry.delete(sessionKey);
-            // generatedSessions.delete(session);
-            fs.rm(sessionPath, { recursive: true, force: true }).catch(() => {});
+
+            const ref = (sessionRef.get(session) ?? 0) - 1;
+
+            if (ref <= 0) {
+                sessionRef.delete(session);
+                await fs.rm(path.resolve(paths.live, session), { recursive: true, force: true }).catch(() => {});
+            } else {
+                sessionRef.set(session, ref);
+                await fs.rm(sessionPath, { recursive: true, force: true }).catch(() => {});
+            }
         });
         sessionRegistry.set(sessionKey, sessionTask);
+        sessionRef.set(session, (sessionRef.get(session) ?? 0) + 1);
         await sessionTask.initalize();
     }
 

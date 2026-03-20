@@ -3,6 +3,7 @@ import { db } from '../shared/configs/db';
 import { sql } from 'drizzle-orm';
 import rateLimit from 'express-rate-limit';
 import { limiterConfigs } from '../shared/limiters';
+import { env } from '../env';
 
 const router = Router();
 
@@ -62,7 +63,7 @@ router.get('/', healthLimiter, async (_req, res) => {
             status: 'healthy',
             uptime: Math.floor(process.uptime()) + 's',
             timestamp: new Date().toISOString(),
-            version: process.env.npm_package_version || '0.0.1',
+            version: env.VERSION,
         });
     } catch {
         res.status(503).json({

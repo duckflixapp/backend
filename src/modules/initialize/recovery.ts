@@ -1,12 +1,12 @@
 import { inArray } from 'drizzle-orm';
 import { db } from '../../shared/configs/db';
-import { movies, movieVersions } from '../../shared/schema';
+import { movies, videoVersions } from '../../shared/schema';
 import { logger } from '../../shared/configs/logger';
 import { notifyJobStatus } from '../../shared/services/notification.service';
 
 export const recoverZombieProcesses = async (systemUserId: string) => {
-    const zombies = await db.query.movieVersions.findMany({
-        where: inArray(movieVersions.status, ['processing', 'waiting']),
+    const zombies = await db.query.videoVersions.findMany({
+        where: inArray(videoVersions.status, ['processing', 'waiting']),
         with: { movie: { columns: { id: true, title: true } } },
     });
 
@@ -15,11 +15,11 @@ export const recoverZombieProcesses = async (systemUserId: string) => {
     logger.warn({ count: zombies.length }, 'Found zombie movie versions, recovering...');
 
     await db
-        .update(movieVersions)
+        .update(videoVersions)
         .set({ status: 'error' })
         .where(
             inArray(
-                movieVersions.id,
+                videoVersions.id,
                 zombies.map((v) => v.id)
             )
         );

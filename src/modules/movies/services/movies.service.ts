@@ -1,6 +1,6 @@
 import { and, asc, count, desc, eq, exists, ilike, inArray, isNotNull, sql } from 'drizzle-orm';
 import { db } from '../../../shared/configs/db';
-import { genres, libraries, libraryItems, movies, moviesToGenres, movieVersions } from '../../../shared/schema';
+import { genres, libraries, libraryItems, movies, moviesToGenres, videoVersions } from '../../../shared/schema';
 import { MovieNotCreatedError, MovieNotFoundError } from '../movies.errors';
 import type { MovieDetailedDTO, MovieDTO, MovieVersionDTO, PaginatedResponse } from '@duckflix/shared';
 import { toMovieDetailedDTO, toMovieDTO } from '../../../shared/mappers/movies.mapper';
@@ -251,7 +251,7 @@ export const getFeatured = async (options: { userId: string | null } = { userId:
         where: and(eq(movies.status, 'ready'), isNotNull(movies.bannerUrl)),
         with: {
             versions: {
-                where: and(eq(movieVersions.status, 'ready'), eq(movieVersions.isOriginal, true)),
+                where: and(eq(videoVersions.status, 'ready'), eq(videoVersions.isOriginal, true)),
                 columns: { id: true },
             },
         },

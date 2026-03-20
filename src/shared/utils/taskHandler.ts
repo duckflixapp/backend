@@ -39,6 +39,22 @@ export class TaskHandler {
     }
 
     /**
+     * Returns number of currently working tasks
+     * @returns current size
+     */
+    public get working(): number {
+        return this.current.length;
+    }
+
+    /**
+     * Returns size of waiting queue
+     * @returns queue size
+     */
+    public get queueSize(): number {
+        return this.taskQueue.size;
+    }
+
+    /**
      * Checks the status of a specific task by its ID.
      * @param taskId - The unique identifier of the task.
      * @returns 'working' if active, 'waiting' if in queue, or undefined if not found.

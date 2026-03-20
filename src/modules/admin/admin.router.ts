@@ -60,4 +60,15 @@ router.delete(
     AdminController.deleteUser
 );
 
+router.get(
+    '/stats',
+    rateLimit({
+        ...limiterConfigs.defaults(),
+        windowMs: 2 * 1000, // 10 per 2s
+        limit: 10,
+        keyGenerator: limiterConfigs.authenticatedKey,
+    }),
+    AdminController.getSystemStatistics
+);
+
 export default router;

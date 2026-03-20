@@ -75,7 +75,7 @@ export const movieParamsSchema = z.object({
     id: z.uuid('Invalid movie ID format'),
 });
 
-export const movieVersionParamsSchema = movieParamsSchema.extend({
+export const videoVersionParamsSchema = movieParamsSchema.extend({
     versionId: z.uuid('Invalid movie version ID format'),
 });
 
