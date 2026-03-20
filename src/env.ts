@@ -11,6 +11,7 @@ const envSchema = z.object({
     ORIGIN: z.url(),
 
     // Configuration
+    STORAGE_LIMIT: z.coerce.number(),
     UPLOAD_FILE_LIMIT: z.coerce.number(),
     DROP_FOLDER: z.string().min(1),
     TEMP_FOLDER: z.string().min(1),

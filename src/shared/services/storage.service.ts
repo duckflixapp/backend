@@ -2,6 +2,7 @@ import { sum } from 'drizzle-orm';
 import { db } from '../configs/db';
 import { videoVersions } from '../schema';
 import { formatBytes } from '../utils/formats';
+import { env } from '../../env';
 
 export interface StorageStatistics {
     usedBytes: number; // int
@@ -17,7 +18,7 @@ export const getStorageStatistics = async (): Promise<StorageStatistics> => {
     const [result] = await db.select({ totalUsed: sum(videoVersions.fileSize) }).from(videoVersions);
 
     const usedBytes = result?.totalUsed ? parseInt(result.totalUsed) : 0;
-    const limitBytes = 20_000_000_000;
+    const limitBytes = env.STORAGE_LIMIT * 1_000_000; // MB -> B
     const availableBytes = Math.max(limitBytes - usedBytes, 0);
     const usedPercent = parseFloat(((usedBytes / limitBytes) * 100).toFixed(1));
 
