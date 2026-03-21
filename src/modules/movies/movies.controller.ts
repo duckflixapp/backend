@@ -9,6 +9,7 @@ import { handleWorkflowError } from './movies.handler';
 import { createGenreSchema } from './validators/genres.validator';
 import { processVideoWorkflow } from './workflows/video.workflow';
 import { processTorrentFileWorkflow } from './workflows/torrent.workflow';
+import { identifyMovieWorkflow } from './workflows/identify.workflow';
 
 export const upload = catchAsync(async (req: Request, res: Response) => {
     const validatedData = createMovieSchema.parse(req.body);
@@ -18,7 +19,14 @@ export const upload = catchAsync(async (req: Request, res: Response) => {
     const torrentFile = files?.['torrent']?.[0];
     if (!videoFile && !torrentFile) throw new AppError('Please provide either a valid video or torrent file', { statusCode: 400 });
 
-    const metadata = await MetadataService.enrichMetadata(validatedData.dbUrl, validatedData);
+    let metadata = await MetadataService.enrichMetadata(validatedData.dbUrl, validatedData);
+    if (!metadata && videoFile) metadata = await identifyMovieWorkflow({ filePath: videoFile.path, fileName: videoFile.originalname });
+    if (!metadata && torrentFile)
+        metadata = await identifyMovieWorkflow({ filePath: torrentFile.path, fileName: torrentFile.originalname }, { checkHash: false });
+    if (!metadata)
+        throw new AppError('Failed to retrieve metadata. Please provide valid movie data or db url', {
+            statusCode: 400,
+        });
 
     const movie = await MoviesService.initiateUpload({
         userId: req.user!.id,

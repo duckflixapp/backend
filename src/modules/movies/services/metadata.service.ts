@@ -24,7 +24,7 @@ export const fillFromUrl = async (url: string): Promise<Partial<VideoMetadata> |
     return null;
 };
 
-export const enrichMetadata = async (url: string | undefined | null, manualData: CreateMovieInput): Promise<VideoMetadata> => {
+export const enrichMetadata = async (url: string | undefined | null, manualData: CreateMovieInput): Promise<VideoMetadata | null> => {
     let externalData: Partial<VideoMetadata> = {};
 
     if (url) {
@@ -32,8 +32,10 @@ export const enrichMetadata = async (url: string | undefined | null, manualData:
         if (partialData) externalData = partialData;
     }
 
+    if (!externalData.title && !manualData.title) return null;
+
     const enrichedMetadata = {
-        title: externalData.title || manualData.title || '',
+        title: externalData.title || manualData.title || null,
         overview: externalData.overview || manualData.overview || '',
         releaseYear: externalData.releaseYear || manualData.releaseYear || new Date().getFullYear(),
         posterUrl: externalData.posterUrl || manualData.posterUrl,
