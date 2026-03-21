@@ -9,9 +9,9 @@ const isProduction = process.env.NODE_ENV === 'production';
 const targets: TransportTargetOptions[] = [];
 
 targets.push({
-    target: isProduction ? 'pino/file' : 'pino-pretty',
+    target: 'pino-pretty',
     level: 'debug',
-    options: { colorize: !isProduction, ignore: 'pid,hostname,reqId,responseTime' },
+    options: { ignore: 'pid,hostname,reqId,responseTime' },
 });
 
 if (isProduction)
