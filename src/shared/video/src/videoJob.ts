@@ -1,7 +1,7 @@
 import { spawn, type Subprocess } from 'bun';
 import type { JobProgress } from '@duckflix/shared';
 import { EventEmitter } from 'node:events';
-import type { Interruptible } from '../../utils/taskRegistry';
+import { taskRegistry, type Interruptible } from '../../utils/taskRegistry';
 import { videoDefaults } from '../src/constants';
 import { buildFfmpegArgs } from './args';
 import { getHardwareDecodingSupport } from './hardware';
@@ -29,7 +29,7 @@ export class VideoJob extends EventEmitter implements Interruptible {
         const hw = getHardwareDecodingSupport();
         const args = buildFfmpegArgs({ mode: 'vod', inputPath: this.inputPath, outputPath: this.outputPath, type: this.type, hw, config });
 
-        return [cmd, ...args];
+        return ['nice', '-n', '5', cmd, ...args];
     }
 
     private async monitorProgress() {
@@ -56,13 +56,14 @@ export class VideoJob extends EventEmitter implements Interruptible {
                         progress = Math.round((seconds / this.config.totalDuration) * 100);
                         if (progress > 100) progress = 100;
                     }
-                    logger.debug({ id: this.proc.pid, progress, time }, '[VideoJob] processing progress');
+                    // logger.debug({ id: this.proc.pid, progress, time }, '[VideoJob] processing progress');
                     this.emit('progress', { time, seconds, progress } as JobProgress);
                 }
             }
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch (err: unknown) {
-            // should catch silently
+            if (err instanceof Error && err.message !== 'ReadableStream is closed') {
+                logger.debug({ err }, '[VideoJob] Progress monitor error');
+            }
         } finally {
             reader.releaseLock();
         }
@@ -71,14 +72,27 @@ export class VideoJob extends EventEmitter implements Interruptible {
     public async start(): Promise<boolean> {
         const ffmpegArgs = this.args(this.config);
 
-        this.proc = spawn(ffmpegArgs, {
+        const proc = spawn(ffmpegArgs, {
             stdout: 'pipe',
             stderr: 'pipe',
         });
 
+        this.proc = proc;
+
+        if (taskRegistry.isPaused) {
+            this.pause();
+        }
+
         this.monitorProgress();
 
-        const exitCode = await this.proc.exited;
+        const exitCode = await proc.exited;
+
+        if (exitCode !== 0 && proc.stderr instanceof ReadableStream) {
+            const stderr = await new Response(proc.stderr).text().catch(() => '');
+            if (stderr.includes('Exiting normally, received signal')) return false;
+
+            logger.warn({ exitCode, stderr: stderr.slice(-500) }, '[VideoJob] FFmpeg exited with non-zero code');
+        }
 
         return exitCode === 0;
     }

@@ -100,7 +100,6 @@ export class SessionTask {
         this.process = runner.proc;
 
         runner.onSegment!((segNum) => {
-            logger.debug({ segNum }, 'Segment Ready via Runner');
             this.readySegments.add(segNum);
             this.notifier.emit(`ready_${segNum}`);
         });

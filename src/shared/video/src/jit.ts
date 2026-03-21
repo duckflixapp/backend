@@ -63,7 +63,7 @@ export async function createJitRunner(opts: {
         },
     });
 
-    const proc = Bun.spawn(['ffmpeg', ...args], { stderr: 'pipe' });
+    const proc = Bun.spawn(['nice', '-n', '2', 'ffmpeg', ...args], { stderr: 'pipe' });
 
     return {
         proc,
