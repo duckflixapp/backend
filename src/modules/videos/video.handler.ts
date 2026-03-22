@@ -1,0 +1,114 @@
+import { eq } from 'drizzle-orm';
+import { db } from '../../shared/configs/db';
+import { videos, videoVersions } from '../../shared/schema';
+import { AppError } from '../../shared/errors';
+import { capitalize } from '../../shared/utils/string';
+import { io } from '../../server';
+import type { DownloadProgress, JobProgress } from '@duckflix/shared';
+import { notifyJobStatus } from '../../shared/services/notification.service';
+import { logger } from '../../shared/configs/logger';
+
+export const handleWorkflowError = async (videoId: string, error: unknown, context: 'video' | 'torrent') => {
+    try {
+        const [updatedVideo] = await db
+            .update(videos)
+            .set({ status: 'error' })
+            .where(eq(videos.id, videoId))
+            .returning({ userId: videos.uploaderId });
+
+        const userId = updatedVideo?.userId;
+        if (userId) {
+            const title = `Error while processing ${context}`;
+            let message = 'Unexpected error.';
+            if (error instanceof AppError) message = error.message;
+
+            notifyJobStatus(userId, 'error', title, message, videoId);
+        }
+    } catch (err: unknown) {
+        logger.fatal({ err, videoId, context }, 'CRITICAL: Failed to mark video status as error in DB');
+    }
+    logger.error(
+        {
+            err: error,
+            videoId,
+            context,
+            workflowStep: 'handleWorkflowError',
+        },
+        `Workflow error in ${context}`
+    );
+};
+
+export const handleProcessingError = async (videoVerId: string, error: unknown, context: 'transcode' | 'task') => {
+    try {
+        const [updatedVersion] = await db.update(videoVersions).set({ status: 'error' }).where(eq(videoVersions.id, videoVerId)).returning({
+            videoId: videoVersions.videoId,
+        });
+
+        if (updatedVersion?.videoId) {
+            const [videoData] = await db.select({ userId: videos.uploaderId }).from(videos).where(eq(videos.id, updatedVersion.videoId));
+
+            if (videoData?.userId) {
+                const title = `Error while ${context === 'task' ? 'doing task' : ' transcoding video'}`;
+                let message = 'Unexpected error.';
+
+                if (error instanceof AppError) {
+                    message = error.message;
+                }
+
+                if (updatedVersion?.videoId)
+                    notifyJobStatus(videoData?.userId, 'error', title, message, updatedVersion.videoId, videoVerId);
+            }
+        }
+    } catch (err: unknown) {
+        logger.fatal({ err, videoVerId, context }, 'CRITICAL: Failed to update video version status to error');
+    }
+    logger.error(
+        {
+            err: error,
+            videoVerId,
+            context,
+            workflowStep: 'handleProcessingError',
+        },
+        `Processing failed during ${context}`
+    );
+};
+
+export const handleVideoTask = async (videoVerId: string, context: 'started' | 'completed' | 'canceled') => {
+    try {
+        const [updatedVersion] = await db
+            .select({ videoId: videoVersions.videoId })
+            .from(videoVersions)
+            .where(eq(videoVersions.id, videoVerId));
+
+        if (updatedVersion?.videoId) {
+            const [videoData] = await db
+                .select({ id: videos.id, userId: videos.uploaderId })
+                .from(videos)
+                .where(eq(videos.id, updatedVersion.videoId));
+
+            if (!videoData?.userId) return;
+
+            const title = `Task ${context}`;
+            let message = `${capitalize(context)} processing task for: ${videoData.id}`;
+
+            if (updatedVersion?.videoId) notifyJobStatus(videoData?.userId, context, title, message, updatedVersion.videoId, videoVerId);
+        }
+        logger.info({ videoVerId, context }, `Video task ${context}`);
+    } catch (err: unknown) {
+        logger.error({ err, videoVerId }, 'Failed to send video task notification');
+    }
+    logger.debug({ videoVerId }, `[VideoTask] processing task ${context}`);
+};
+
+export const emitVideoProgress = (
+    videoId: string,
+    status: 'downloading' | 'processing' | 'error',
+    progress?: JobProgress | DownloadProgress,
+    versionId?: string
+) => {
+    io.to(`video:${videoId}`).emit('video:progress', {
+        status,
+        versionId,
+        progress,
+    });
+};

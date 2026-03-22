@@ -1,28 +1,11 @@
 import { Router } from 'express';
 import * as MoviesController from './movies.controller';
 import * as MoviesVersionsController from './versions.controller';
-import { movieUpload } from '../../shared/configs/multer.config';
 import { limiterConfigs } from '../../shared/limiters';
 import rateLimit from 'express-rate-limit';
 import { hasRole } from '../../shared/middlewares/auth.middleware';
 
 const router = Router();
-
-router.post(
-    '/upload',
-    hasRole('contributor'),
-    rateLimit({
-        ...limiterConfigs.defaults(),
-        windowMs: 30 * 1000, // 20 per 30s
-        limit: 20,
-        keyGenerator: limiterConfigs.authenticatedKey,
-    }),
-    movieUpload.fields([
-        { name: 'video', maxCount: 1 },
-        { name: 'torrent', maxCount: 1 },
-    ]),
-    MoviesController.upload
-);
 
 router.get(
     '/',
@@ -101,42 +84,6 @@ router.patch(
         keyGenerator: limiterConfigs.authenticatedKey,
     }),
     MoviesController.updateOne
-);
-
-router.get(
-    '/:id/versions/',
-    hasRole('contributor'),
-    rateLimit({
-        ...limiterConfigs.defaults(),
-        windowMs: 2 * 1000, // 30 per 2s
-        limit: 30,
-        keyGenerator: limiterConfigs.authenticatedKey,
-    }),
-    MoviesVersionsController.getMany
-);
-
-router.post(
-    '/:id/versions',
-    hasRole('contributor'),
-    rateLimit({
-        ...limiterConfigs.defaults(),
-        windowMs: 2 * 1000, // 30 per 2s
-        limit: 30,
-        keyGenerator: limiterConfigs.authenticatedKey,
-    }),
-    MoviesVersionsController.addVersion
-);
-
-router.delete(
-    '/:id/versions/:versionId',
-    hasRole('contributor'),
-    rateLimit({
-        ...limiterConfigs.defaults(),
-        windowMs: 2 * 1000, // 30 per 2s
-        limit: 30,
-        keyGenerator: limiterConfigs.authenticatedKey,
-    }),
-    MoviesVersionsController.deleteVersion
 );
 
 router.post(

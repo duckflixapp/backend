@@ -1,30 +1,24 @@
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { db } from '../../../shared/configs/db';
-import { TorrentDownloadError } from '../movies.errors';
 import type { DownloadProgress } from '@duckflix/shared';
 import { paths } from '../../../shared/configs/path.config';
 import { AppError } from '../../../shared/errors';
 import { TorrentClient, validateTorrentFileSize } from '../../../shared/utils/torrent';
 import { RqbitClient } from '../../../shared/lib/rqbit';
-import { emitMovieProgress } from '../movies.handler';
+import { emitVideoProgress } from '../video.handler';
 import { notifyJobStatus } from '../../../shared/services/notification.service';
 import { env } from '../../../env';
 import { logger } from '../../../shared/configs/logger';
-import { movies } from '../../../shared/schema';
 import { eq } from 'drizzle-orm';
 import { processVideoWorkflow } from './video.workflow';
+import { videos } from '../../../shared/schema';
+import { TorrentDownloadError } from '../video.errors';
 
 const rqbitClient = new RqbitClient({ baseUrl: env.RQBIT_URL! });
 const torrentClient = new TorrentClient({ rqbit: rqbitClient });
 
-export const processTorrentFileWorkflow = async (data: {
-    userId: string;
-    movieId: string;
-    movieTitle: string;
-    torrentPath: string;
-    imdbId: string | null;
-}) => {
+export const processTorrentFileWorkflow = async (data: { userId: string; videoId: string; torrentPath: string; imdbId: string | null }) => {
     let torrentBuffer: Buffer;
     try {
         const valid = await validateTorrentFileSize(data.torrentPath);
@@ -43,14 +37,14 @@ export const processTorrentFileWorkflow = async (data: {
         throw new TorrentDownloadError(e);
     });
 
-    torrent.addListener('progress', (progress) => emitMovieProgress(data.movieId, 'downloading', progress as DownloadProgress));
+    torrent.addListener('progress', (progress) => emitVideoProgress(data.videoId, 'downloading', progress as DownloadProgress));
 
     torrent.addListener('error', ({ error, code }) => {
         logger.debug(
             {
                 err: error,
                 errorCode: code,
-                movieId: data.movieId,
+                videoId: data.videoId,
                 context: 'torrent_client',
             },
             'Torrent download status error'
@@ -58,10 +52,10 @@ export const processTorrentFileWorkflow = async (data: {
     });
 
     try {
-        logger.info({ movieId: data.movieId }, 'Torrent waiting for download...');
-        notifyJobStatus(data.userId, 'started', `Movie started downloading`, data.movieTitle, data.movieId).catch(() => {});
+        logger.info({ videoId: data.videoId }, 'Torrent waiting for download...');
+        notifyJobStatus(data.userId, 'started', `Video started downloading`, data.videoId, data.videoId).catch(() => {});
         await torrent.waitDownload();
-        logger.info({ movieId: data.movieId }, 'Torrent download finished...');
+        logger.info({ videoId: data.videoId }, 'Torrent download finished...');
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
         fs.rm(torrent.dir, { recursive: true, force: true }).catch(() => {});
@@ -69,8 +63,8 @@ export const processTorrentFileWorkflow = async (data: {
     }
 
     try {
-        await db.update(movies).set({ status: 'processing' }).where(eq(movies.id, data.movieId));
-        notifyJobStatus(data.userId, 'downloaded', `Movie downloaded`, `Movie download completed. Processing...`, data.movieId).catch(
+        await db.update(videos).set({ status: 'processing' }).where(eq(videos.id, data.videoId));
+        notifyJobStatus(data.userId, 'downloaded', `Video downloaded`, `Video download completed. Processing...`, data.videoId).catch(
             () => {}
         );
     } catch (e) {
@@ -85,7 +79,7 @@ export const processTorrentFileWorkflow = async (data: {
         const downloadedPath = path.join(torrent.dir, mainFile.name);
 
         const ext = path.extname(mainFile.name);
-        safePath = path.join(paths.downloads, `${data.movieId}-torrent${ext}`);
+        safePath = path.join(paths.downloads, `${data.videoId}-torrent${ext}`);
         await fs.rename(downloadedPath, safePath);
     } catch (e) {
         throw new AppError('Video could not be copied after downloading', { cause: e });
@@ -96,7 +90,7 @@ export const processTorrentFileWorkflow = async (data: {
 
     await processVideoWorkflow({
         userId: data.userId,
-        movieId: data.movieId,
+        videoId: data.videoId,
         tempPath: safePath,
         originalName: mainFile.name,
         fileSize: mainFile.length,

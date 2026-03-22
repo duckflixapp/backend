@@ -5,7 +5,7 @@ import { MovieNotFoundError, OriginalMovieVersionNotFoundError } from '../movies
 import { AppError } from '../../../shared/errors';
 import path from 'node:path';
 import { paths } from '../../../shared/configs/path.config';
-import { startProcessing } from '../movies.processor';
+import { startProcessing } from '../../videos/video.processor';
 import fs from 'node:fs/promises';
 import { toMovieVersionDTO } from '../../../shared/mappers/movies.mapper';
 import { taskHandler } from '../../../shared/utils/taskHandler';

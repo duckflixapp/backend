@@ -5,7 +5,7 @@ import * as MetadataService from './services/metadata.service';
 import { catchAsync } from '../../shared/utils/catchAsync';
 import { AppError } from '../../shared/errors';
 import { createMovieSchema, movieParamsSchema, movieQuerySchema, updateMovieSchema } from './validators/movies.validator';
-import { handleWorkflowError } from './movies.handler';
+import { handleWorkflowError } from '../videos/video.handler';
 import { createGenreSchema } from './validators/genres.validator';
 import { processVideoWorkflow } from './workflows/video.workflow';
 import { processTorrentFileWorkflow } from './workflows/torrent.workflow';

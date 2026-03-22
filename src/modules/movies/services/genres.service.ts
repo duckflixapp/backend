@@ -1,11 +1,11 @@
-import type { GenreDTO } from '@duckflix/shared';
+import type { MovieGenreDTO } from '@duckflix/shared';
 import { genres } from '../../../shared/schema';
 import { db } from '../../../shared/configs/db';
 import { toGenreDTO } from '../../../shared/mappers/movies.mapper';
 import { inArray } from 'drizzle-orm';
 import { AppError } from '../../../shared/errors';
 
-export const createGenre = async (name: string): Promise<GenreDTO> => {
+export const createGenre = async (name: string): Promise<MovieGenreDTO> => {
     const results = await db
         .insert(genres)
         .values({ name })
@@ -17,7 +17,7 @@ export const createGenre = async (name: string): Promise<GenreDTO> => {
     return toGenreDTO(results[0]);
 };
 
-export const getGenres = async (): Promise<GenreDTO[]> => {
+export const getGenres = async (): Promise<MovieGenreDTO[]> => {
     const results = await db.select().from(genres).orderBy(genres.name);
     return results.map(toGenreDTO);
 };

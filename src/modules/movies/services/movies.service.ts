@@ -1,6 +1,6 @@
 import { and, asc, count, desc, eq, exists, ilike, inArray, isNotNull, sql } from 'drizzle-orm';
 import { db } from '../../../shared/configs/db';
-import { genres, libraries, libraryItems, movies, moviesToGenres, videoVersions } from '../../../shared/schema';
+import { genres, libraries, libraryItems, movies, moviesToGenres, videos, videoVersions } from '../../../shared/schema';
 import { MovieNotCreatedError, MovieNotFoundError } from '../movies.errors';
 import type { MovieDetailedDTO, MovieDTO, MovieVersionDTO, PaginatedResponse } from '@duckflix/shared';
 import { toMovieDetailedDTO, toMovieDTO } from '../../../shared/mappers/movies.mapper';
@@ -12,46 +12,6 @@ import { paths } from '../../../shared/configs/path.config';
 import fs from 'node:fs/promises';
 import { taskRegistry } from '../../../shared/utils/taskRegistry';
 import { taskHandler } from '../../../shared/utils/taskHandler';
-
-export const initiateUpload = async (
-    data: {
-        userId: string;
-        status: 'downloading' | 'processing';
-    } & VideoMetadata
-): Promise<MovieDTO> => {
-    const [dbMovie] = await db
-        .insert(movies)
-        .values({
-            title: data.title,
-            description: data.overview,
-            bannerUrl: data.bannerUrl,
-            posterUrl: data.posterUrl,
-            rating: data.rating?.toString() ?? null,
-            releaseYear: data.releaseYear,
-            duration: null,
-            status: data.status,
-            uploaderId: data.userId,
-        })
-        .returning();
-    if (!dbMovie) throw new MovieNotCreatedError();
-
-    if (data.genreIds && data.genreIds.length > 0) {
-        const values = data.genreIds.map((genreId) => ({ movieId: dbMovie.id, genreId: genreId }));
-        await db
-            .insert(moviesToGenres)
-            .values(values)
-            .catch(async (err) => {
-                throw new AppError('Database insert failed for movie genres', { statusCode: 500, cause: err });
-            });
-    }
-
-    const selectedGenres =
-        data.genreIds && data.genreIds.length > 0 ? await db.select().from(genres).where(inArray(genres.id, data.genreIds)) : [];
-    return toMovieDTO({
-        ...dbMovie,
-        genres: selectedGenres.map((genre) => ({ genre })),
-    });
-};
 
 const getOrderBy = (orderBy: string | null) => {
     switch (orderBy) {
@@ -128,16 +88,23 @@ export const getMovies = async (options: {
 export const deleteMovieById = async (id: string) => {
     const movie = await db.query.movies.findFirst({
         where: eq(movies.id, id),
-        with: { versions: true },
+        with: {
+            video: {
+                with: {
+                    versions: true,
+                },
+            },
+        },
     });
 
-    if (!movie) throw new MovieNotFoundError();
+    if (!movie || !movie.video) throw new MovieNotFoundError();
+    const video = movie.video;
 
-    if (movie.status === 'processing') throw new AppError('Wait until video is processed', { statusCode: 403 });
+    if (video.status === 'processing') throw new AppError('Wait until video is processed', { statusCode: 403 });
 
-    if (movie.status === 'downloading') throw new AppError('Wait until video is downloaded', { statusCode: 403 });
+    if (video.status === 'downloading') throw new AppError('Wait until video is downloaded', { statusCode: 403 });
 
-    for (const version of movie.versions) {
+    for (const version of video.versions) {
         if (version.status === 'processing') {
             await taskRegistry.kill(version.id).catch(() => {});
         } else if (version.status === 'waiting') {
@@ -145,9 +112,9 @@ export const deleteMovieById = async (id: string) => {
         }
     }
 
-    const movieDir = path.resolve(paths.storage, 'movies', movie.id);
-    await fs.rm(movieDir, { recursive: true, force: true }).catch(() => {});
-    await db.delete(movies).where(eq(movies.id, id));
+    const videoDir = path.resolve(paths.storage, 'videos', video.id);
+    await fs.rm(videoDir, { recursive: true, force: true }).catch(() => {});
+    await db.delete(videos).where(eq(videos.id, video.id));
 };
 
 export const updateMovieById = async (id: string, data: Partial<VideoMetadata>): Promise<MovieDetailedDTO> => {
@@ -156,7 +123,7 @@ export const updateMovieById = async (id: string, data: Partial<VideoMetadata>):
             .update(movies)
             .set({
                 title: data.title,
-                description: data.overview,
+                overview: data.overview,
                 releaseYear: data.releaseYear,
                 rating: data.rating?.toString() ?? null,
                 bannerUrl: data.bannerUrl,
@@ -193,14 +160,18 @@ export const getMovieById = async (id: string, options: { userId: string | null 
                     genre: true,
                 },
             },
-            versions: true,
-            subtitles: true,
-            uploader: {
-                columns: {
-                    id: true,
-                    name: true,
-                    role: true,
-                    system: true,
+            video: {
+                with: {
+                    versions: true,
+                    subtitles: true,
+                    uploader: {
+                        columns: {
+                            id: true,
+                            name: true,
+                            role: true,
+                            system: true,
+                        },
+                    },
                 },
             },
         },

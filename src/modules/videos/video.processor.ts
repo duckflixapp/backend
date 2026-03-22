@@ -6,37 +6,37 @@ import { VideoJob, type JobType } from '../../shared/video';
 import { ffprobe } from '../../shared/video';
 import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
-import { VideoProcessingError } from './movies.errors';
 import { taskHandler } from '../../shared/utils/taskHandler';
-import { emitMovieProgress, handleMovieTask, handleProcessingError } from './movies.handler';
+import { emitVideoProgress, handleVideoTask, handleProcessingError } from './video.handler';
 import { AppError } from '../../shared/errors';
 import { taskRegistry } from '../../shared/utils/taskRegistry';
+import { VideoProcessingError } from './video.errors';
 
-export const createMovieStorageKey = (movieId: string, versionId: string, file: string) => `movies/${movieId}/${versionId}/${file}`;
+export const createVideoStorageKey = (videoId: string, versionId: string, file: string) => `videos/${videoId}/${versionId}/${file}`;
 
-taskHandler.addListener('started', (taskId) => handleMovieTask(taskId, 'started'));
-taskHandler.addListener('completed', (taskId) => handleMovieTask(taskId, 'completed'));
-taskHandler.addListener('canceled', (taskId) => handleMovieTask(taskId, 'canceled'));
+taskHandler.addListener('started', (taskId) => handleVideoTask(taskId, 'started'));
+taskHandler.addListener('completed', (taskId) => handleVideoTask(taskId, 'completed'));
+taskHandler.addListener('canceled', (taskId) => handleVideoTask(taskId, 'canceled'));
 taskHandler.addListener('error', (taskId, e) => handleProcessingError(taskId, e, 'task')); // this should be already catched in func handleVideoProcess
 
-const handleVideoProcess = (movieVer: VideoVersion, originalPath: string, outputPath: string) => {
+const handleVideoProcess = (videoVer: VideoVersion, originalPath: string, outputPath: string) => {
     const runnable = () =>
-        processTask(movieVer, originalPath, outputPath).catch((e) => {
-            handleProcessingError(movieVer.id, e, 'transcode');
+        processTask(videoVer, originalPath, outputPath).catch((e) => {
+            handleProcessingError(videoVer.id, e, 'transcode');
             return -1;
         });
 
-    taskHandler.handle(runnable, movieVer.id);
+    taskHandler.handle(runnable, videoVer.id);
 };
 
-export const startProcessing = async (movieId: string, tasksToRun: number[], storageFolder: string, originalPath: string) => {
+export const startProcessing = async (videoId: string, tasksToRun: number[], storageFolder: string, originalPath: string) => {
     // insert tasks into db
     const tasksVersions = tasksToRun.map<NewVideoVersion>((height) => {
         const versionId = randomUUID();
-        const storageKey = createMovieStorageKey(movieId, versionId, 'index.m3u8');
+        const storageKey = createVideoStorageKey(videoId, versionId, 'index.m3u8');
         return {
             id: versionId,
-            movieId: movieId,
+            videoId,
             width: null,
             height: height,
             isOriginal: false,
@@ -51,7 +51,7 @@ export const startProcessing = async (movieId: string, tasksToRun: number[], sto
         .values(tasksVersions)
         .returning()
         .catch(async (err) => {
-            throw new AppError('Database insert failed for movie version', { cause: err });
+            throw new AppError('Database insert failed for video version', { cause: err });
         });
 
     waitingTasks.forEach((task) => handleVideoProcess(task, originalPath, path.join(storageFolder, task.storageKey)));
@@ -85,7 +85,7 @@ const processTask = async (task: VideoVersion, originalPath: string, outputPath:
             totalDuration,
         });
         taskRegistry.register(task.id, job);
-        job.addListener('progress', (progress) => emitMovieProgress(task.movieId, 'processing', progress, task.id));
+        job.addListener('progress', (progress) => emitVideoProgress(task.videoId, 'processing', progress, task.id));
 
         const successfull = await job.start();
         taskRegistry.unregister(task.id);

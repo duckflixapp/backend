@@ -4,8 +4,8 @@ import { fillFromTMDBId, searchTMDB } from '../providers/tmdb.provider';
 import type { VideoMetadata } from '../services/metadata.service';
 import { logger } from '../../../shared/configs/logger';
 
-export const identifyMovieWorkflow = async (
-    data: { filePath: string; fileName?: string },
+export const identifyVideoWorkflow = async (
+    data: { filePath: string; fileName?: string; type?: 'movie' },
     options = { checkHash: true }
 ): Promise<VideoMetadata> => {
     // try to find through hash

@@ -2,7 +2,7 @@ import { AppError } from '../../../shared/errors';
 import { parseIdFromUrl } from '../providers/imdb.provider';
 import { fillFromIMDBId, fillFromTMDBUrl } from '../providers/tmdb.provider';
 import { isVideoMetadata } from '../validators/metadata.validator';
-import type { CreateMovieInput, UpdateMovieInput } from '../validators/movies.validator';
+import type { CreateVideoInput } from '../video.validator';
 
 export interface VideoMetadata {
     title: string;
@@ -24,7 +24,7 @@ export const fillFromUrl = async (url: string): Promise<Partial<VideoMetadata> |
     return null;
 };
 
-export const enrichMetadata = async (url: string | undefined | null, manualData: CreateMovieInput): Promise<VideoMetadata | null> => {
+export const enrichMetadata = async (url: string | undefined | null, manualData: CreateVideoInput): Promise<VideoMetadata | null> => {
     let externalData: Partial<VideoMetadata> = {};
 
     if (url) {
@@ -50,40 +50,40 @@ export const enrichMetadata = async (url: string | undefined | null, manualData:
     return enrichedMetadata;
 };
 
-export const enrichUpdateMetadata = async (
-    url: string | undefined | null,
-    manualData: UpdateMovieInput
-): Promise<Partial<VideoMetadata>> => {
-    let externalData: Partial<VideoMetadata> = {};
+// export const enrichUpdateMetadata = async (
+//     url: string | undefined | null,
+//     manualData: UpdateMovieInput
+// ): Promise<Partial<VideoMetadata>> => {
+//     let externalData: Partial<VideoMetadata> = {};
 
-    if (url) {
-        const partialData = await fillFromUrl(url);
-        if (partialData) externalData = partialData;
-    }
+//     if (url) {
+//         const partialData = await fillFromUrl(url);
+//         if (partialData) externalData = partialData;
+//     }
 
-    const result: Partial<VideoMetadata> = {};
+//     const result: Partial<VideoMetadata> = {};
 
-    const title = externalData.title || manualData.title;
-    if (title !== undefined) result.title = title ?? undefined;
+//     const title = externalData.title || manualData.title;
+//     if (title !== undefined) result.title = title ?? undefined;
 
-    const overview = externalData.overview || manualData.overview;
-    if (overview !== undefined) result.overview = overview;
+//     const overview = externalData.overview || manualData.overview;
+//     if (overview !== undefined) result.overview = overview;
 
-    const releaseYear = externalData.releaseYear || manualData.releaseYear;
-    if (releaseYear !== undefined) result.releaseYear = releaseYear;
+//     const releaseYear = externalData.releaseYear || manualData.releaseYear;
+//     if (releaseYear !== undefined) result.releaseYear = releaseYear;
 
-    const posterUrl = externalData.posterUrl || manualData.posterUrl;
-    if (posterUrl !== undefined) result.posterUrl = posterUrl;
+//     const posterUrl = externalData.posterUrl || manualData.posterUrl;
+//     if (posterUrl !== undefined) result.posterUrl = posterUrl;
 
-    const bannerUrl = externalData.bannerUrl || manualData.bannerUrl;
-    if (bannerUrl !== undefined) result.bannerUrl = bannerUrl;
+//     const bannerUrl = externalData.bannerUrl || manualData.bannerUrl;
+//     if (bannerUrl !== undefined) result.bannerUrl = bannerUrl;
 
-    if (manualData.genreIds !== undefined) {
-        result.genreIds = externalData.genreIds?.length ? externalData.genreIds : manualData.genreIds;
-    }
+//     if (manualData.genreIds !== undefined) {
+//         result.genreIds = externalData.genreIds?.length ? externalData.genreIds : manualData.genreIds;
+//     }
 
-    if (externalData.imdbId) result.imdbId = externalData.imdbId;
-    if (externalData.rating) result.rating = externalData.rating;
+//     if (externalData.imdbId) result.imdbId = externalData.imdbId;
+//     if (externalData.rating) result.rating = externalData.rating;
 
-    return result;
-};
+//     return result;
+// };

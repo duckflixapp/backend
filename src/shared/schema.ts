@@ -86,59 +86,30 @@ export const accountTokens = pgTable('account_tokens', {
 
 export type AccountToken = InferSelectModel<typeof accountTokens>;
 
-export const movies = pgTable(
-    'movies',
-    {
-        id: uuid('id').defaultRandom().primaryKey(),
-        uploaderId: uuid('uploader_id').references(() => users.id, { onDelete: 'set null' }),
-        title: text('title').notNull(),
-        description: text('description'),
-        bannerUrl: text('banner_url'),
-        posterUrl: text('poster_url'),
-        rating: decimal('rating', { precision: 3, scale: 1 }).default('0.0'),
-        releaseYear: integer('release_year'),
-        duration: integer('duration'), // null while uploading or similar - seconds
-        status: text('status').$type<'downloading' | 'processing' | 'ready' | 'error'>().default('processing').notNull(),
-        createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' }).notNull().defaultNow(),
-    },
-    (table) => [index('title_idx').on(table.title), index('created_at_idx').on(table.createdAt)]
-);
+export const videos = pgTable('videos', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    uploaderId: uuid('uploader_id').references(() => users.id, { onDelete: 'set null' }),
+    duration: integer('duration'), // null while uploading or similar - seconds
+    status: text('status').$type<'downloading' | 'processing' | 'ready' | 'error'>().default('processing').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' }).notNull().defaultNow(),
+});
 
 export const subtitles = pgTable('subtitles', {
     id: uuid('id').defaultRandom().primaryKey(),
-    movieId: uuid('movie_id')
+    videoId: uuid('video_id')
         .notNull()
-        .references(() => movies.id, { onDelete: 'cascade' }),
+        .references(() => videos.id, { onDelete: 'cascade' }),
     language: text('language').notNull(),
     storageKey: text('storage_key').notNull(),
     externalId: text('external_id'),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' }).notNull().defaultNow(),
 });
 
-export const genres = pgTable('genres', {
+export const videoVersions = pgTable('video_versions', {
     id: uuid('id').defaultRandom().primaryKey(),
-    name: text('name').notNull().unique(),
-});
-
-// pivot table
-export const moviesToGenres = pgTable(
-    'movies_to_genres',
-    {
-        movieId: uuid('movie_id')
-            .notNull()
-            .references(() => movies.id, { onDelete: 'cascade' }),
-        genreId: uuid('genre_id')
-            .notNull()
-            .references(() => genres.id, { onDelete: 'cascade' }),
-    },
-    (t) => [index('movie_genre_idx').on(t.movieId, t.genreId)]
-);
-
-export const videoVersions = pgTable('movie_versions', {
-    id: uuid('id').defaultRandom().primaryKey(),
-    movieId: uuid('movie_id')
+    videoId: uuid('video_id')
         .notNull()
-        .references(() => movies.id, { onDelete: 'cascade' }),
+        .references(() => videos.id, { onDelete: 'cascade' }),
     width: integer('width'), // can be null while task is in process
     height: integer('height').notNull(),
     isOriginal: boolean('is_original').default(false).notNull(),
@@ -149,24 +120,65 @@ export const videoVersions = pgTable('movie_versions', {
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' }).notNull().defaultNow(),
 });
 
-export const moviesRelations = relations(movies, ({ one, many }) => ({
+export const movies = pgTable('movies', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    videoId: uuid('video_id')
+        .references(() => videos.id)
+        .unique(),
+    title: text('title').notNull(),
+    overview: text('overview'),
+    bannerUrl: text('banner_url'),
+    posterUrl: text('poster_url'),
+    rating: decimal('rating', { precision: 3, scale: 1 }).default('0.0'),
+    releaseYear: integer('release_year'),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' }).notNull().defaultNow(),
+});
+
+export const movieGenres = pgTable('movie_genres', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    name: text('name').notNull().unique(),
+});
+
+// pivot table
+export const moviesToGenres = pgTable(
+    'movie_to_genres',
+    {
+        movieId: uuid('movie_id')
+            .notNull()
+            .references(() => movies.id, { onDelete: 'cascade' }),
+        genreId: uuid('genre_id')
+            .notNull()
+            .references(() => movieGenres.id, { onDelete: 'cascade' }),
+    },
+    (t) => [index('movie_genre_idx').on(t.movieId, t.genreId)]
+);
+
+export const videosRelations = relations(videos, ({ one, many }) => ({
     uploader: one(users, {
-        fields: [movies.uploaderId],
+        fields: [videos.uploaderId],
         references: [users.id],
     }),
+    movies: one(movies),
     versions: many(videoVersions),
-    genres: many(moviesToGenres),
     subtitles: many(subtitles),
 }));
 
+export const moviesRelations = relations(movies, ({ one, many }) => ({
+    video: one(videos, {
+        fields: [movies.videoId],
+        references: [videos.id],
+    }),
+    genres: many(moviesToGenres),
+}));
+
 export const subtitlesRelations = relations(subtitles, ({ one }) => ({
-    movie: one(movies, {
-        fields: [subtitles.movieId],
-        references: [movies.id],
+    movie: one(videos, {
+        fields: [subtitles.videoId],
+        references: [videos.id],
     }),
 }));
 
-export const genresRelations = relations(genres, ({ many }) => ({
+export const genresRelations = relations(movieGenres, ({ many }) => ({
     movies: many(moviesToGenres),
 }));
 
@@ -175,24 +187,24 @@ export const moviesToGenresRelations = relations(moviesToGenres, ({ one }) => ({
         fields: [moviesToGenres.movieId],
         references: [movies.id],
     }),
-    genre: one(genres, {
+    genre: one(movieGenres, {
         fields: [moviesToGenres.genreId],
-        references: [genres.id],
+        references: [movieGenres.id],
     }),
 }));
 
 export const videoVersionsRelations = relations(videoVersions, ({ one }) => ({
-    movie: one(movies, {
-        fields: [videoVersions.movieId],
-        references: [movies.id],
+    movie: one(videos, {
+        fields: [videoVersions.videoId],
+        references: [videos.id],
     }),
 }));
 
 export const notifications = pgTable('notifications', {
     id: uuid('id').defaultRandom().primaryKey(),
     userId: uuid('user_id'),
-    movieId: uuid('movie_id').references(() => movies.id, { onDelete: 'cascade' }),
-    movieVerId: uuid('movie_version_id').references(() => videoVersions.id, { onDelete: 'cascade' }),
+    videoId: uuid('movie_id').references(() => videos.id, { onDelete: 'cascade' }),
+    videoVerId: uuid('movie_version_id').references(() => videoVersions.id, { onDelete: 'cascade' }),
     type: text('type').$type<'info' | 'error' | 'success' | 'warning'>().default('info').notNull(),
     title: text('title').notNull(),
     message: text('message').notNull(),
@@ -201,8 +213,9 @@ export const notifications = pgTable('notifications', {
 });
 
 export type Movie = InferSelectModel<typeof movies>;
+export type Video = InferSelectModel<typeof videos>;
 export type Subtitle = InferSelectModel<typeof subtitles>;
-export type Genre = InferSelectModel<typeof genres>;
+export type Genre = InferSelectModel<typeof movieGenres>;
 export type VideoVersion = InferSelectModel<typeof videoVersions>;
 export type Notification = InferSelectModel<typeof notifications>;
 

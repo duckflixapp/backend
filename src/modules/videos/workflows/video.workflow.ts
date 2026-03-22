@@ -2,11 +2,11 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 import { eq } from 'drizzle-orm';
 import { db } from '../../../shared/configs/db';
-import { movies, videoVersions } from '../../../shared/schema';
-import { InvalidVideoFileError } from '../movies.errors';
+import { movies, videos, videoVersions } from '../../../shared/schema';
+import { InvalidVideoFileError } from '../video.errors';
 import { randomUUID } from 'node:crypto';
 import { ffprobe } from '../../../shared/video';
-import { createMovieStorageKey, startProcessing } from '../movies.processor';
+import { createVideoStorageKey, startProcessing } from '../video.processor';
 import { getMimeTypeFromFormat } from '../../../shared/utils/ffmpeg';
 import { paths } from '../../../shared/configs/path.config';
 import { AppError } from '../../../shared/errors';
@@ -19,7 +19,7 @@ import { getStorageStatistics } from '../../../shared/services/storage.service';
 
 export const processVideoWorkflow = async (data: {
     userId: string;
-    movieId: string;
+    videoId: string;
     tempPath: string;
     originalName: string;
     fileSize: number;
@@ -57,7 +57,7 @@ export const processVideoWorkflow = async (data: {
     // create path for movie version
     const fileExt = path.extname(data.originalName);
     const originalId = randomUUID();
-    const storageKey = createMovieStorageKey(data.movieId, originalId, 'index' + fileExt);
+    const storageKey = createVideoStorageKey(data.videoId, originalId, 'index' + fileExt);
     const finalPath = path.join(paths.storage, storageKey);
 
     try {
@@ -65,7 +65,7 @@ export const processVideoWorkflow = async (data: {
         await fs.rename(data.tempPath, finalPath);
     } catch (e) {
         await fs.unlink(data.tempPath).catch(() => {});
-        await fs.rm(path.join(paths.storage, 'movies', data.movieId), { recursive: true, force: true }).catch(() => {});
+        await fs.rm(path.join(paths.storage, 'videos', data.videoId), { recursive: true, force: true }).catch(() => {});
         throw new AppError('Video could not be moved into storage', { cause: e });
     }
 
@@ -74,7 +74,7 @@ export const processVideoWorkflow = async (data: {
         await db.transaction(async (tx) => {
             await tx.insert(videoVersions).values({
                 id: originalId,
-                movieId: data.movieId,
+                videoId: data.videoId,
                 width: originalWidth,
                 height: originalHeight,
                 isOriginal: true,
@@ -83,25 +83,25 @@ export const processVideoWorkflow = async (data: {
                 mimeType,
                 status: 'ready',
             });
-            await tx.update(movies).set({ duration, status: 'ready' }).where(eq(movies.id, data.movieId));
+            await tx.update(videos).set({ duration, status: 'ready' }).where(eq(movies.id, data.videoId));
         });
-        notifyJobStatus(data.userId, 'completed', `Upload completed`, `Movie uploaded successfully`, data.movieId).catch(() => {});
+        notifyJobStatus(data.userId, 'completed', `Upload completed`, `Video uploaded successfully`, data.videoId).catch(() => {});
     } catch (e) {
         await fs.unlink(finalPath).catch(() => {});
         throw new AppError('Video could not be saved in database', { cause: e });
     }
 
     // Subtitles
-    await extractSubtitlesWorkflow({ filePath: finalPath, movieId: data.movieId, metadata });
+    await extractSubtitlesWorkflow({ filePath: finalPath, videoId: data.videoId, metadata });
 
     // - External
     if (data.imdbId) {
         const movieHash = await computeHash(finalPath);
-        downloadSubtitlesWorkflow({ movieId: data.movieId, imdbId: data.imdbId, movieHash }).catch((err) => {
+        downloadSubtitlesWorkflow({ videoId: data.videoId, imdbId: data.imdbId, movieHash }).catch((err) => {
             logger.error(
                 {
                     err,
-                    movieId: data.movieId,
+                    videoId: data.videoId,
                     imdbId: data.imdbId,
                     context: 'subtitles_service',
                 },
@@ -134,5 +134,5 @@ export const processVideoWorkflow = async (data: {
         }
     }
 
-    if (tasksToRun.size > 0) startProcessing(data.movieId, Array.from(tasksToRun), paths.storage, finalPath);
+    if (tasksToRun.size > 0) startProcessing(data.videoId, Array.from(tasksToRun), paths.storage, finalPath);
 };

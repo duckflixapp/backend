@@ -1,7 +1,5 @@
 import { paths } from '../../../shared/configs/path.config';
 import { systemSettings } from '../../../shared/services/system.service';
-import { SubtitleDownloadError } from '../movies.errors';
-import { mapSubtitles, subtitlesClient } from '../services/subs.service';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import fs from 'node:fs/promises';
@@ -12,6 +10,8 @@ import { AppError } from '../../../shared/errors';
 import { logger } from '../../../shared/configs/logger';
 import type { FFprobeData } from '../../../shared/video/src/probe';
 import { normalizeLanguage } from '../../../shared/utils/subs';
+import { mapSubtitles, subtitlesClient } from '../services/subs.service';
+import { SubtitleDownloadError } from '../video.errors';
 
 const SUPPORTED_SUB_CODECS = [
     'subrip', // SRT
@@ -28,11 +28,11 @@ const SKIP_SUB_CODECS = [
     'dvb_teletext',
 ];
 
-export const extractSubtitlesWorkflow = async (data: { filePath: string; movieId: string; metadata: FFprobeData }) => {
+export const extractSubtitlesWorkflow = async (data: { filePath: string; videoId: string; metadata: FFprobeData }) => {
     const subStreams = data.metadata.streams.filter((s) => s.codec_type === 'subtitle');
 
     if (subStreams.length === 0) {
-        logger.debug({ movieId: data.movieId }, '[ExtractSubtitlesWorkflow] No subtitles found');
+        logger.debug({ videoId: data.videoId }, '[ExtractSubtitlesWorkflow] No subtitles found');
         return;
     }
 
@@ -40,7 +40,7 @@ export const extractSubtitlesWorkflow = async (data: { filePath: string; movieId
     if (imageBasedSubs.length > 0) {
         logger.debug(
             {
-                movieId: data.movieId,
+                videoId: data.videoId,
                 count: imageBasedSubs.length,
             },
             '[ExtractSubtitlesWorkflow] Image-based subtitles skipped'
@@ -50,7 +50,7 @@ export const extractSubtitlesWorkflow = async (data: { filePath: string; movieId
     const textBasedSubs = subStreams.filter((s) => SUPPORTED_SUB_CODECS.includes(s.codec_name ?? ''));
     logger.debug(
         {
-            movieId: data.movieId,
+            videId: data.videoId,
             count: textBasedSubs.length,
         },
         '[ExtractSubtitlesWorkflow] Found text based subs'
@@ -81,7 +81,7 @@ export const extractSubtitlesWorkflow = async (data: { filePath: string; movieId
 
             await db
                 .insert(subtitles)
-                .values({ movieId: data.movieId, language: language, externalId: null, storageKey })
+                .values({ videoId: data.videoId, language: language, externalId: null, storageKey })
                 .catch(async (err) => {
                     await fs.unlink(finalPath).catch(() => {});
                     throw new AppError('Database insert failed for subtitle', { cause: err });
@@ -89,7 +89,7 @@ export const extractSubtitlesWorkflow = async (data: { filePath: string; movieId
 
             logger.info(
                 {
-                    movieId: data.movieId,
+                    videoId: data.videoId,
                     language: language,
                     storageKey,
                 },
@@ -98,7 +98,7 @@ export const extractSubtitlesWorkflow = async (data: { filePath: string; movieId
         } catch (err) {
             const log = {
                 err,
-                movieId: data.movieId,
+                videoId: data.videoId,
                 language: language,
             };
             if (err instanceof AppError) logger.warn(log, `[ExtractSubtitlesWorkflow] ${err.message}`);
@@ -107,7 +107,7 @@ export const extractSubtitlesWorkflow = async (data: { filePath: string; movieId
     }
 };
 
-export const downloadSubtitlesWorkflow = async (data: { movieId: string; imdbId: string; movieHash?: string }) => {
+export const downloadSubtitlesWorkflow = async (data: { videoId: string; imdbId: string; movieHash?: string }) => {
     const sysSettings = await systemSettings.get();
     const preferences = sysSettings.preferences.subtitles;
 
@@ -137,7 +137,7 @@ export const downloadSubtitlesWorkflow = async (data: { movieId: string; imdbId:
 
             await db
                 .insert(subtitles)
-                .values({ movieId: data.movieId, language: subtitle.language, externalId: subtitle.id, storageKey })
+                .values({ videoId: data.videoId, language: subtitle.language, externalId: subtitle.id, storageKey })
                 .catch(async (err) => {
                     await fs.unlink(finalPath).catch(() => {});
                     throw new AppError('Database insert failed for subtitle', { cause: err });
@@ -145,7 +145,7 @@ export const downloadSubtitlesWorkflow = async (data: { movieId: string; imdbId:
 
             logger.info(
                 {
-                    movieId: data.movieId,
+                    videoId: data.videoId,
                     language: subtitle.language,
                     storageKey,
                 },
@@ -154,7 +154,7 @@ export const downloadSubtitlesWorkflow = async (data: { movieId: string; imdbId:
         } catch (err) {
             const log = {
                 err,
-                movieId: data.movieId,
+                videoId: data.videoId,
                 language: subtitle.language,
                 externalId: subtitle.id,
             };

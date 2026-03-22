@@ -1,8 +1,8 @@
 import { eq } from 'drizzle-orm';
-import { movies, type Movie, type VideoVersion } from '../../shared/schema';
+import { videos, type Video, type VideoVersion } from '../../shared/schema';
 import { db } from '../../shared/configs/db';
 import { env } from '../../env';
-import { MovieNotFoundError, NoMovieMediaFoundError, NotStandardResolutionError, TooBigResolutionError } from './live.errors';
+import { NotStandardResolutionError, NoVideoMediaFoundError, TooBigResolutionError, VideoNotFoundError } from './live.errors';
 import { SessionTask } from './sessionTask';
 import path from 'node:path';
 import { paths } from '../../shared/configs/path.config';
@@ -26,23 +26,23 @@ const masterStream = (v: { streamUrl: string; width: number; height: number; ban
 
 const mediaBase = `${env.BASE_URL}/media`;
 
-const generatedSessions = new Map<string, { movieId: string; storageKey: string; height: number; duration: number }>();
-export const generateMasterFile = async (movieId: string) => {
-    const movie = await db.query.movies.findFirst({ where: eq(movies.id, movieId), with: { versions: true } });
-    if (!movie) throw new MovieNotFoundError();
+const generatedSessions = new Map<string, { videoId: string; storageKey: string; height: number; duration: number }>();
+export const generateMasterFile = async (videoId: string) => {
+    const video = await db.query.videos.findFirst({ where: eq(videos.id, videoId), with: { versions: true } });
+    if (!video) throw new VideoNotFoundError();
 
-    const original = movie.versions.find((v) => v.isOriginal);
-    if (!original) throw new NoMovieMediaFoundError();
+    const original = video.versions.find((v) => v.isOriginal);
+    if (!original) throw new NoVideoMediaFoundError();
 
-    const versions = movie.versions.filter((v) => v.mimeType === 'application/x-mpegURL').sort((a, b) => b.height - a.height);
+    const versions = video.versions.filter((v) => v.mimeType === 'application/x-mpegURL').sort((a, b) => b.height - a.height);
     const includedHeights = versions.map((v) => v.height);
 
     const session = crypto.randomUUID();
     generatedSessions.set(session, {
-        movieId: movie.id,
+        videoId: video.id,
         storageKey: original.storageKey,
         height: original.height,
-        duration: movie.duration!,
+        duration: video.duration!,
     });
 
     let master = `#EXTM3U\n`;
@@ -51,7 +51,7 @@ export const generateMasterFile = async (movieId: string) => {
     if (!includedHeights.includes(original.height)) {
         const originalWidth = original.width || 1920;
         master += `#EXT-X-STREAM-INF:BANDWIDTH=${original.height * 2000},RESOLUTION=${originalWidth}x${original.height},NAME="Original"\n`;
-        master += `${mediaBase}/live/${movie.id}/${original.height}/index.m3u8?session=${session}\n\n`;
+        master += `${mediaBase}/live/${video.id}/${original.height}/index.m3u8?session=${session}\n\n`;
     }
 
     // add every existing version
@@ -72,7 +72,7 @@ export const generateMasterFile = async (movieId: string) => {
         .forEach((p) => {
             const width = Math.round((p.height * aspect) / 2) * 2;
             master += masterStream({
-                streamUrl: `${mediaBase}/live/${movie.id}/${p.height}/index.m3u8`,
+                streamUrl: `${mediaBase}/live/${video.id}/${p.height}/index.m3u8`,
                 width,
                 height: p.height,
                 bandwidth: p.bitrate,
@@ -84,19 +84,19 @@ export const generateMasterFile = async (movieId: string) => {
     return master;
 };
 
-export const getMovieWithOriginal = async (movieId: string): Promise<{ movie: Movie; original: VideoVersion }> => {
-    const movie = await db.query.movies.findFirst({ where: eq(movies.id, movieId), with: { versions: true } });
-    if (!movie) throw new MovieNotFoundError();
-    if (!movie.duration) throw new NoMovieMediaFoundError();
+export const getVideoWithOriginal = async (videoId: string): Promise<{ video: Video; original: VideoVersion }> => {
+    const video = await db.query.videos.findFirst({ where: eq(videos.id, videoId), with: { versions: true } });
+    if (!video) throw new VideoNotFoundError();
+    if (!video.duration) throw new NoVideoMediaFoundError();
 
-    const original = movie.versions.find((v) => v.isOriginal);
-    if (!original) throw new NoMovieMediaFoundError();
+    const original = video.versions.find((v) => v.isOriginal);
+    if (!original) throw new NoVideoMediaFoundError();
 
-    return { movie, original };
+    return { video, original };
 };
 
 export const generateManifestFile = async (
-    movie: Movie,
+    video: Video,
     original: VideoVersion,
     height: number,
     session: string,
@@ -105,7 +105,7 @@ export const generateManifestFile = async (
     if (height > original.height) throw new TooBigResolutionError();
     if (!presetHeights.includes(height)) throw new NotStandardResolutionError();
 
-    const totalSegments = Math.ceil(movie.duration! / options.segmentDuration);
+    const totalSegments = Math.ceil(video.duration! / options.segmentDuration);
 
     let m3u8 = `#EXTM3U
 #EXT-X-VERSION:3
@@ -114,10 +114,10 @@ export const generateManifestFile = async (
 #EXT-X-PLAYLIST-TYPE:VOD\n`;
 
     for (let i = 0; i < totalSegments; i++) {
-        const duration = i === totalSegments - 1 ? movie.duration! - i * options.segmentDuration : options.segmentDuration;
+        const duration = i === totalSegments - 1 ? video.duration! - i * options.segmentDuration : options.segmentDuration;
 
         m3u8 += `#EXTINF:${duration.toFixed(6)},\n`;
-        m3u8 += `${env.BASE_URL}/media/live/${movie.id}/${height}/seg-${i}.ts?session=${session}\n`;
+        m3u8 += `${env.BASE_URL}/media/live/${video.id}/${height}/seg-${i}.ts?session=${session}\n`;
     }
     m3u8 += '#EXT-X-ENDLIST';
 
@@ -126,9 +126,9 @@ export const generateManifestFile = async (
 
 export const sessionRegistry = new Map<string, SessionTask>();
 export const sessionRef = new Map<string, number>();
-export const ensureLiveSegment = async (movieId: string, session: string, height: number, options = { segment: 0, segmentDuration: 6 }) => {
+export const ensureLiveSegment = async (videoId: string, session: string, height: number, options = { segment: 0, segmentDuration: 6 }) => {
     const original = generatedSessions.get(session);
-    if (!original || original.movieId !== movieId) throw new AppError('Session not found', { statusCode: 404 });
+    if (!original || original.videoId !== videoId) throw new AppError('Session not found', { statusCode: 404 });
     if (height > original.height) throw new TooBigResolutionError();
     if (!presetHeights.includes(height)) throw new NotStandardResolutionError();
 

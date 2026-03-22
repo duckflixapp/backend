@@ -7,35 +7,34 @@ import { AppError } from '../../shared/errors';
 const segmentDuration = 6;
 
 export const getLiveMaster = catchAsync(async (req: Request, res: Response) => {
-    const { movieId } = liveMasterSchema.parse(req.params);
+    const { videoId } = liveMasterSchema.parse(req.params);
 
-    const master = await LiveMediaService.generateMasterFile(movieId);
+    const master = await LiveMediaService.generateMasterFile(videoId);
 
     res.setHeader('Content-Type', 'application/x-mpegURL');
     res.send(master);
 });
 
 export const getLiveManifest = catchAsync(async (req: Request, res: Response) => {
-    const { movieId, height } = liveManifestSchema.parse(req.params);
+    const { videoId, height } = liveManifestSchema.parse(req.params);
     const { session } = sessionSchema.parse(req.query);
 
-    const { movie, original } = await LiveMediaService.getMovieWithOriginal(movieId);
-    const m3u8 = await LiveMediaService.generateManifestFile(movie, original, height, session, { segmentDuration });
+    const { video, original } = await LiveMediaService.getVideoWithOriginal(videoId);
+    const m3u8 = await LiveMediaService.generateManifestFile(video, original, height, session, { segmentDuration });
 
     res.setHeader('Content-Type', 'application/x-mpegURL');
     res.send(m3u8);
 });
 
 export const getLiveSegment = catchAsync(async (req: Request, res: Response) => {
-    const { movieId, height, segmentName } = liveSegmentSchema.parse(req.params);
+    const { videoId, height, segmentName } = liveSegmentSchema.parse(req.params);
     const { session } = sessionSchema.parse(req.query);
 
     const indexMatch = segmentName.match(/\d+/);
     if (!indexMatch) throw new AppError('Invalid segment name', { statusCode: 400 });
     const segmentIndex = parseInt(indexMatch[0]);
 
-    const path = await LiveMediaService.ensureLiveSegment(movieId, session, height, { segment: segmentIndex, segmentDuration });
-    console.log(path);
+    const path = await LiveMediaService.ensureLiveSegment(videoId, session, height, { segment: segmentIndex, segmentDuration });
 
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     res.setHeader('Content-Type', 'video/MP2T');

@@ -1,20 +1,20 @@
-import { initiateUpload } from '../services/movies.service';
-import { identifyMovieWorkflow } from './identify.workflow';
+import { identifyVideoWorkflow } from './identify.workflow';
 import { processVideoWorkflow } from './video.workflow';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { logger } from '../../../shared/configs/logger';
 import { paths } from '../../../shared/configs/path.config';
 import chokidar from 'chokidar';
-import { handleWorkflowError } from '../movies.handler';
+import { handleWorkflowError } from '../video.handler';
 import { notifyJobStatus } from '../../../shared/services/notification.service';
 import { AppError } from '../../../shared/errors';
+import { initiateUpload } from '../video.service';
 
 export const processWatcherWorkflow = async (data: { filePath: string; fileName: string; fileSize: number }, systemUserId: string) => {
-    const metadata = await identifyMovieWorkflow({ filePath: data.filePath });
-    logger.debug({ fileName: data.fileName, metadata }, '[WatcherWorkflow] Identified movie');
+    const metadata = await identifyVideoWorkflow({ filePath: data.filePath });
+    logger.debug({ fileName: data.fileName, metadata }, '[WatcherWorkflow] Identified video');
 
-    const movie = await initiateUpload({
+    const video = await initiateUpload('movie', {
         userId: systemUserId,
         status: 'processing',
         ...metadata,
@@ -22,12 +22,12 @@ export const processWatcherWorkflow = async (data: { filePath: string; fileName:
 
     await processVideoWorkflow({
         userId: systemUserId,
-        movieId: movie.id,
+        videoId: video.id,
         tempPath: data.filePath,
         originalName: data.fileName,
         fileSize: data.fileSize,
         imdbId: metadata.imdbId,
-    }).catch((e) => handleWorkflowError(movie.id, e, 'movie'));
+    }).catch((e) => handleWorkflowError(video.id, e, 'video'));
 };
 
 const SUPPORTED_EXTENSIONS = ['.mkv', '.mp4', '.avi', '.mov', '.m4v'];

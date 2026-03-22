@@ -1,13 +1,12 @@
 import { inArray } from 'drizzle-orm';
 import { db } from '../../shared/configs/db';
-import { movies, videoVersions } from '../../shared/schema';
+import { videos, videoVersions } from '../../shared/schema';
 import { logger } from '../../shared/configs/logger';
 import { notifyJobStatus } from '../../shared/services/notification.service';
 
 export const recoverZombieProcesses = async (systemUserId: string) => {
     const zombies = await db.query.videoVersions.findMany({
         where: inArray(videoVersions.status, ['processing', 'waiting']),
-        with: { movie: { columns: { id: true, title: true } } },
     });
 
     if (zombies.length === 0) return;
@@ -30,15 +29,15 @@ export const recoverZombieProcesses = async (systemUserId: string) => {
                 systemUserId,
                 'error',
                 'Processing failed',
-                `Version ${version.height}p of "${version.movie?.title ?? version.movieId}" was interrupted and marked as error.`,
-                version.movieId,
+                `Version ${version.height}p of "${version.videoId}" was interrupted and marked as error.`,
+                version.videoId,
                 version.id
             ).catch(() => {});
 
             logger.warn(
                 {
                     versionId: version.id,
-                    movieId: version.movieId,
+                    movieId: version.videoId,
                     height: version.height,
                     status: version.status,
                 },
@@ -51,8 +50,8 @@ export const recoverZombieProcesses = async (systemUserId: string) => {
 };
 
 export const recoverZombieMovies = async (systemUserId: string) => {
-    const zombies = await db.query.movies.findMany({
-        where: inArray(movies.status, ['processing', 'downloading']),
+    const zombies = await db.query.videos.findMany({
+        where: inArray(videos.status, ['processing', 'downloading']),
     });
 
     if (zombies.length === 0) return;
@@ -60,34 +59,34 @@ export const recoverZombieMovies = async (systemUserId: string) => {
     logger.warn({ count: zombies.length }, 'Found zombie movie, recovering...');
 
     await db
-        .update(movies)
+        .update(videos)
         .set({ status: 'error' })
         .where(
             inArray(
-                movies.id,
+                videos.id,
                 zombies.map((v) => v.id)
             )
         );
 
-    for (const movie of zombies) {
+    for (const video of zombies) {
         try {
             await notifyJobStatus(
                 systemUserId,
                 'error',
                 'Processing failed',
-                `Movie "${movie.title}" was interrupted and marked as error.`,
-                movie.id
+                `Video "${video.id}" was interrupted and marked as error.`,
+                video.id
             ).catch(() => {});
 
             logger.warn(
                 {
-                    movieId: movie.id,
-                    status: movie.status,
+                    movieId: video.id,
+                    status: video.status,
                 },
                 'Zombie movie recovered'
             );
         } catch (err) {
-            logger.error({ err, movieId: movie.id }, 'Failed to recover zombie version');
+            logger.error({ err, videoId: video.id }, 'Failed to recover zombie version');
         }
     }
 };

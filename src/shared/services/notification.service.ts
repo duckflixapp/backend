@@ -14,8 +14,8 @@ export const notifyJobStatus = async (
     status: 'started' | 'completed' | 'downloaded' | 'canceled' | 'error',
     title: string,
     message: string,
-    movieId?: string,
-    movieVerId?: string
+    videoId?: string,
+    videoVerId?: string
 ) => {
     const typeMap = {
         completed: 'success',
@@ -40,8 +40,8 @@ export const notifyJobStatus = async (
 
     const values = targetIds.map((id) => ({
         userId: id,
-        movieId: movieId,
-        movieVerId: movieVerId,
+        videoId,
+        videoVerId,
         type: finalType,
         title,
         message,
@@ -50,7 +50,7 @@ export const notifyJobStatus = async (
     await db
         .insert(notifications)
         .values(values)
-        .catch((err) => logger.error({ err, userId, movieId, status }, 'Failed to save notification to database'));
+        .catch((err) => logger.error({ err, userId, videoId, status }, 'Failed to save notification to database'));
 
-    targetIds.forEach((id) => notifyUser(id, { movieId, movieVerId, status, title, message }));
+    targetIds.forEach((id) => notifyUser(id, { videoId, videoVerId, status, title, message }));
 };
