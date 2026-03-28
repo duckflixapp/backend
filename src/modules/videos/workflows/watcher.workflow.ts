@@ -14,10 +14,9 @@ export const processWatcherWorkflow = async (data: { filePath: string; fileName:
     const metadata = await identifyVideoWorkflow({ filePath: data.filePath });
     logger.debug({ fileName: data.fileName, metadata }, '[WatcherWorkflow] Identified video');
 
-    const video = await initiateUpload('movie', {
+    const video = await initiateUpload(metadata, {
         userId: systemUserId,
         status: 'processing',
-        ...metadata,
     });
 
     await processVideoWorkflow({

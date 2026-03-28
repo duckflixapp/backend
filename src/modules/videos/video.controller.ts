@@ -7,29 +7,35 @@ import * as VideoService from './video.service';
 import { processVideoWorkflow } from './workflows/video.workflow';
 import { processTorrentFileWorkflow } from './workflows/torrent.workflow';
 import { handleWorkflowError } from './video.handler';
-import * as MetadataService from './services/metadata.service';
+import * as MetadataService from '../../shared/metadata/metadata.service';
 
 export const upload = catchAsync(async (req: Request, res: Response) => {
-    const validatedData = createVideoSchema.parse(req.body);
+    const data = createVideoSchema.parse(req.body);
+    const type = data.type;
     const files = req.files as { [fieldname: string]: Express.Multer.File[] };
 
     const videoFile = files?.['video']?.[0];
     const torrentFile = files?.['torrent']?.[0];
     if (!videoFile && !torrentFile) throw new AppError('Please provide either a valid video or torrent file', { statusCode: 400 });
 
-    let metadata = await MetadataService.enrichMetadata(validatedData.dbUrl, validatedData);
-    if (!metadata && videoFile) metadata = await identifyVideoWorkflow({ filePath: videoFile.path, fileName: videoFile.originalname });
+    const metadataEnrich = MetadataService.metadataEnrichers[type];
+    let metadata = await metadataEnrich(data.dbUrl, data);
+
+    if (!metadata && videoFile)
+        metadata = await identifyVideoWorkflow({ filePath: videoFile.path, fileName: videoFile.originalname, type });
     if (!metadata && torrentFile)
-        metadata = await identifyVideoWorkflow({ filePath: torrentFile.path, fileName: torrentFile.originalname }, { checkHash: false });
+        metadata = await identifyVideoWorkflow(
+            { filePath: torrentFile.path, fileName: torrentFile.originalname, type },
+            { checkHash: false }
+        );
     if (!metadata)
         throw new AppError('Failed to retrieve metadata. Please provide valid movie data or db url', {
             statusCode: 400,
         });
 
-    const video = await VideoService.initiateUpload('movie', {
+    const video = await VideoService.initiateUpload(metadata, {
         userId: req.user!.id,
         status: videoFile ? 'processing' : 'downloading',
-        ...metadata,
     });
 
     if (videoFile)

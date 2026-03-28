@@ -1,11 +1,10 @@
-import { and, asc, count, desc, eq, exists, ilike, inArray, isNotNull, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, exists, ilike, isNotNull, sql } from 'drizzle-orm';
 import { db } from '../../../shared/configs/db';
-import { genres, libraries, libraryItems, movies, moviesToGenres, videos, videoVersions } from '../../../shared/schema';
-import { MovieNotCreatedError, MovieNotFoundError } from '../movies.errors';
-import type { MovieDetailedDTO, MovieDTO, MovieVersionDTO, PaginatedResponse } from '@duckflix/shared';
+import { libraries, libraryItems, movies, moviesToGenres, videos, videoVersions } from '../../../shared/schema';
+import { MovieNotFoundError } from '../movies.errors';
+import type { MovieDetailedDTO, MovieDTO, PaginatedResponse, VideoVersionDTO } from '@duckflix/shared';
 import { toMovieDetailedDTO, toMovieDTO } from '../../../shared/mappers/movies.mapper';
 import { AppError } from '../../../shared/errors';
-import type { VideoMetadata } from './metadata.service';
 import { env } from '../../../env';
 import path from 'node:path';
 import { paths } from '../../../shared/configs/path.config';
@@ -37,7 +36,7 @@ export const getMovies = async (options: {
     const offset = (options.page - 1) * options.limit;
 
     const searchFilter = options.search ? ilike(movies.title, `%${options.search}%`) : null;
-    const readyFilter = eq(movies.status, 'ready');
+    // const readyFilter = eq(movies.status, 'ready');
     const genreFilter = options.genreId
         ? exists(
               db
@@ -47,7 +46,7 @@ export const getMovies = async (options: {
           )
         : null;
 
-    const conditions = [searchFilter, readyFilter, genreFilter];
+    const conditions = [searchFilter, genreFilter]; // readyFilter];
     const filters = and(...conditions.filter((cond) => cond != null));
 
     const orderBy = getOrderBy(options.orderBy ?? null);
@@ -63,6 +62,20 @@ export const getMovies = async (options: {
                 genres: {
                     with: {
                         genre: true,
+                    },
+                },
+                video: {
+                    with: {
+                        uploader: {
+                            with: {
+                                id: true,
+                                name: true,
+                                role: true,
+                                system: true,
+                            },
+                        },
+                        versions: true,
+                        subtitles: true,
                     },
                 },
             },
@@ -117,39 +130,39 @@ export const deleteMovieById = async (id: string) => {
     await db.delete(videos).where(eq(videos.id, video.id));
 };
 
-export const updateMovieById = async (id: string, data: Partial<VideoMetadata>): Promise<MovieDetailedDTO> => {
-    await db.transaction(async (tx) => {
-        const modified = await tx
-            .update(movies)
-            .set({
-                title: data.title,
-                overview: data.overview,
-                releaseYear: data.releaseYear,
-                rating: data.rating?.toString() ?? null,
-                bannerUrl: data.bannerUrl,
-                posterUrl: data.posterUrl,
-            })
-            .where(eq(movies.id, id));
+// export const updateMovieById = async (id: string, data: Partial<VideoMetadata>): Promise<MovieDetailedDTO> => {
+//     await db.transaction(async (tx) => {
+//         const modified = await tx
+//             .update(movies)
+//             .set({
+//                 title: data.title,
+//                 overview: data.overview,
+//                 releaseYear: data.releaseYear,
+//                 rating: data.rating?.toString() ?? null,
+//                 bannerUrl: data.bannerUrl,
+//                 posterUrl: data.posterUrl,
+//             })
+//             .where(eq(movies.id, id));
 
-        if (modified.rowCount === 0) throw new MovieNotFoundError();
+//         if (modified.rowCount === 0) throw new MovieNotFoundError();
 
-        if (data.genreIds) {
-            await tx.delete(moviesToGenres).where(eq(moviesToGenres.movieId, id));
+//         if (data.genreIds) {
+//             await tx.delete(moviesToGenres).where(eq(moviesToGenres.movieId, id));
 
-            if (data.genreIds.length > 0) {
-                const values = data.genreIds.map((genreId) => ({ movieId: id, genreId: genreId }));
-                await tx
-                    .insert(moviesToGenres)
-                    .values(values)
-                    .catch(async (err) => {
-                        throw new AppError('Database insert failed for movie genres', { statusCode: 500, cause: err });
-                    });
-            }
-        }
-    });
+//             if (data.genreIds.length > 0) {
+//                 const values = data.genreIds.map((genreId) => ({ movieId: id, genreId: genreId }));
+//                 await tx
+//                     .insert(moviesToGenres)
+//                     .values(values)
+//                     .catch(async (err) => {
+//                         throw new AppError('Database insert failed for movie genres', { statusCode: 500, cause: err });
+//                     });
+//             }
+//         }
+//     });
 
-    return getMovieById(id);
-};
+//     return getMovieById(id);
+// };
 
 export const getMovieById = async (id: string, options: { userId: string | null } = { userId: null }): Promise<MovieDetailedDTO> => {
     const result = await db.query.movies.findFirst({
@@ -192,12 +205,13 @@ export const getMovieById = async (id: string, options: { userId: string | null 
 
     const dto = toMovieDetailedDTO(result, inLibrary);
 
-    const original = result.versions.find((v) => v.isOriginal);
-    if (original && result.duration) {
+    const video = result.video;
+    const original = video.versions.find((v) => v.isOriginal);
+    if (original && video.duration) {
         const livePresets = [2160, 1440, 1080, 720, 480];
-        const existingHeights = result.versions.filter((v) => v.status === 'ready').map((v) => v.height);
+        const existingHeights = video.versions.filter((v) => v.status === 'ready').map((v) => v.height);
 
-        const liveVersions: MovieVersionDTO[] = livePresets
+        const liveVersions: VideoVersionDTO[] = livePresets
             .filter((h) => h <= original.height && !existingHeights.includes(h))
             .map((h) => ({
                 id: `live-${h}`,
@@ -210,7 +224,7 @@ export const getMovieById = async (id: string, options: { userId: string | null 
                 fileSize: null,
             }));
 
-        dto.generatedVersions = liveVersions;
+        dto.video.generatedVersions = liveVersions;
     }
 
     return dto;
@@ -219,11 +233,15 @@ export const getMovieById = async (id: string, options: { userId: string | null 
 export const getFeatured = async (options: { userId: string | null } = { userId: null }) => {
     // internal logic to find featured movie...
     const featured = await db.query.movies.findFirst({
-        where: and(eq(movies.status, 'ready'), isNotNull(movies.bannerUrl)),
+        where: isNotNull(movies.bannerUrl),
         with: {
-            versions: {
-                where: and(eq(videoVersions.status, 'ready'), eq(videoVersions.isOriginal, true)),
-                columns: { id: true },
+            video: {
+                with: {
+                    versions: {
+                        where: and(eq(videoVersions.status, 'ready'), eq(videoVersions.isOriginal, true)),
+                        columns: { id: true },
+                    },
+                },
             },
         },
         orderBy: desc(movies.createdAt),

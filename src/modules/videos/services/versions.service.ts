@@ -1,27 +1,27 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '../../../shared/configs/db';
-import { movies, videoVersions } from '../../../shared/schema';
-import { MovieNotFoundError, OriginalMovieVersionNotFoundError } from '../movies.errors';
+import { videos, videoVersions } from '../../../shared/schema';
+import { MovieNotFoundError, OriginalMovieVersionNotFoundError } from '../../movies/movies.errors';
 import { AppError } from '../../../shared/errors';
 import path from 'node:path';
 import { paths } from '../../../shared/configs/path.config';
-import { startProcessing } from '../../videos/video.processor';
+import { startProcessing } from '../video.processor';
 import fs from 'node:fs/promises';
-import { toMovieVersionDTO } from '../../../shared/mappers/movies.mapper';
+import { toVideoVersionDTO } from '../../../shared/mappers/video.mapper';
 import { taskHandler } from '../../../shared/utils/taskHandler';
 import { taskRegistry } from '../../../shared/utils/taskRegistry';
 
-export const getAllMovieVersions = async (movieId: string) => {
+export const getAllVideoVersions = async (videoId: string) => {
     const results = await db.query.videoVersions.findMany({
-        where: eq(videoVersions.movieId, movieId),
+        where: eq(videoVersions.videoId, videoId),
     });
 
-    return results.map(toMovieVersionDTO);
+    return results.map(toVideoVersionDTO);
 };
 
-export const addMovieVersion = async (movieId: string, height: number) => {
-    const result = await db.query.movies.findFirst({
-        where: eq(movies.id, movieId),
+export const addVideoVersion = async (videoId: string, height: number) => {
+    const result = await db.query.videos.findFirst({
+        where: eq(videos.id, videoId),
         with: {
             versions: {
                 where: and(eq(videoVersions.isOriginal, true), eq(videoVersions.status, 'ready')),
@@ -38,7 +38,7 @@ export const addMovieVersion = async (movieId: string, height: number) => {
 
     const existing = await db.query.videoVersions.findFirst({
         where: and(
-            eq(videoVersions.movieId, movieId),
+            eq(videoVersions.videoId, videoId),
             eq(videoVersions.height, height),
             eq(videoVersions.mimeType, 'application/x-mpegURL'),
             inArray(videoVersions.status, ['ready', 'processing', 'waiting'])
@@ -48,12 +48,12 @@ export const addMovieVersion = async (movieId: string, height: number) => {
 
     const originalPath = path.resolve(paths.storage, original.storageKey);
 
-    await startProcessing(movieId, [height], paths.storage, originalPath);
+    await startProcessing(videoId, [height], paths.storage, originalPath);
 };
 
-export const deleteMovieVersion = async (movieId: string, versionId: string) => {
+export const deleteVideoVersion = async (videoId: string, versionId: string) => {
     const version = await db.query.videoVersions.findFirst({
-        where: and(eq(videoVersions.id, versionId), eq(videoVersions.movieId, movieId)),
+        where: and(eq(videoVersions.id, versionId), eq(videoVersions.videoId, videoId)),
     });
 
     if (!version) throw new AppError('Version not found', { statusCode: 404 });

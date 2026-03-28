@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import * as MoviesController from './movies.controller';
-import * as MoviesVersionsController from './versions.controller';
 import { limiterConfigs } from '../../shared/limiters';
 import rateLimit from 'express-rate-limit';
 import { hasRole } from '../../shared/middlewares/auth.middleware';

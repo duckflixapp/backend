@@ -1,64 +1,10 @@
 import type { Request, Response } from 'express';
 import * as MoviesService from './services/movies.service';
 import * as GenresService from './services/genres.service';
-import * as MetadataService from './services/metadata.service';
 import { catchAsync } from '../../shared/utils/catchAsync';
 import { AppError } from '../../shared/errors';
-import { createMovieSchema, movieParamsSchema, movieQuerySchema, updateMovieSchema } from './validators/movies.validator';
-import { handleWorkflowError } from '../videos/video.handler';
+import { movieParamsSchema, movieQuerySchema } from './validators/movies.validator';
 import { createGenreSchema } from './validators/genres.validator';
-import { processVideoWorkflow } from './workflows/video.workflow';
-import { processTorrentFileWorkflow } from './workflows/torrent.workflow';
-import { identifyMovieWorkflow } from './workflows/identify.workflow';
-
-export const upload = catchAsync(async (req: Request, res: Response) => {
-    const validatedData = createMovieSchema.parse(req.body);
-    const files = req.files as { [fieldname: string]: Express.Multer.File[] };
-
-    const videoFile = files?.['video']?.[0];
-    const torrentFile = files?.['torrent']?.[0];
-    if (!videoFile && !torrentFile) throw new AppError('Please provide either a valid video or torrent file', { statusCode: 400 });
-
-    let metadata = await MetadataService.enrichMetadata(validatedData.dbUrl, validatedData);
-    if (!metadata && videoFile) metadata = await identifyMovieWorkflow({ filePath: videoFile.path, fileName: videoFile.originalname });
-    if (!metadata && torrentFile)
-        metadata = await identifyMovieWorkflow({ filePath: torrentFile.path, fileName: torrentFile.originalname }, { checkHash: false });
-    if (!metadata)
-        throw new AppError('Failed to retrieve metadata. Please provide valid movie data or db url', {
-            statusCode: 400,
-        });
-
-    const movie = await MoviesService.initiateUpload({
-        userId: req.user!.id,
-        status: videoFile ? 'processing' : 'downloading',
-        ...metadata,
-    });
-
-    if (videoFile)
-        processVideoWorkflow({
-            userId: req.user!.id,
-            movieId: movie.id,
-            imdbId: metadata.imdbId,
-            tempPath: videoFile.path,
-            originalName: videoFile.originalname,
-            fileSize: videoFile.size,
-        }).catch((e) => handleWorkflowError(movie.id, e, 'movie'));
-    else if (torrentFile?.path) {
-        processTorrentFileWorkflow({
-            userId: req.user!.id,
-            movieId: movie.id,
-            movieTitle: movie.title,
-            imdbId: metadata.imdbId,
-            torrentPath: torrentFile?.path,
-        }).catch((e) => handleWorkflowError(movie.id, e, 'torrent'));
-    } else throw new Error('Please provide valid video file or torrent');
-
-    res.status(201).json({
-        status: 'success',
-        message: torrentFile ? 'Torrent download initiated.' : 'Video processing started.',
-        data: { movie },
-    });
-});
 
 export const getMany = catchAsync(async (req: Request, res: Response) => {
     const options = movieQuerySchema.parse(req.query);
@@ -106,18 +52,15 @@ export const deleteOne = catchAsync(async (req: Request, res: Response) => {
     });
 });
 
-export const updateOne = catchAsync(async (req: Request, res: Response) => {
-    const { id } = movieParamsSchema.parse(req.params);
-    const validatedData = updateMovieSchema.parse(req.body);
-
-    const metadata = await MetadataService.enrichUpdateMetadata(validatedData.dbUrl, validatedData);
-
-    const movie = await MoviesService.updateMovieById(id, metadata);
-
-    res.status(200).json({
-        status: 'success',
-        data: { movie },
-    });
+export const updateOne = catchAsync(async (_req: Request, _res: Response) => {
+    // const { id } = movieParamsSchema.parse(req.params);
+    // const validatedData = updateMovieSchema.parse(req.body);
+    // const metadata = await MetadataService.enrichUpdateMetadata(validatedData.dbUrl, validatedData);
+    // const movie = await MoviesService.updateMovieById(id, metadata);
+    // res.status(200).json({
+    //     status: 'success',
+    //     data: { movie },
+    // });
 });
 
 export const createGenre = catchAsync(async (req: Request, res: Response) => {

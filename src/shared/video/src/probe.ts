@@ -1,6 +1,6 @@
 import { spawn } from 'bun';
 import path from 'path';
-import { VideoProcessingError } from '../../../modules/movies/movies.errors';
+import { AppError } from '../../errors';
 
 export interface FFprobeStream {
     index: number;
@@ -42,12 +42,12 @@ export const ffprobe = async (filePath: string): Promise<FFprobeData> => {
 
     if (exitCode !== 0) {
         const errorText = await new Response(proc.stderr).text();
-        throw new VideoProcessingError(`FFprobe failed`, new Error(errorText));
+        throw new AppError(`FFprobe failed`, { cause: new Error(errorText), statusCode: 500 });
     }
 
     try {
         return (await new Response(proc.stdout).json()) as FFprobeData;
     } catch (e) {
-        throw new VideoProcessingError('Failed to parse FFprobe JSON output', e);
+        throw new AppError('Failed to parse FFprobe JSON output', { cause: e });
     }
 };

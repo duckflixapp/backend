@@ -123,7 +123,8 @@ export const videoVersions = pgTable('video_versions', {
 export const movies = pgTable('movies', {
     id: uuid('id').defaultRandom().primaryKey(),
     videoId: uuid('video_id')
-        .references(() => videos.id)
+        .references(() => videos.id, { onDelete: 'cascade' })
+        .notNull()
         .unique(),
     title: text('title').notNull(),
     overview: text('overview'),
@@ -141,7 +142,7 @@ export const movieGenres = pgTable('movie_genres', {
 
 // pivot table
 export const moviesToGenres = pgTable(
-    'movie_to_genres',
+    'movies_to_genres',
     {
         movieId: uuid('movie_id')
             .notNull()
@@ -203,7 +204,7 @@ export const videoVersionsRelations = relations(videoVersions, ({ one }) => ({
 export const notifications = pgTable('notifications', {
     id: uuid('id').defaultRandom().primaryKey(),
     userId: uuid('user_id'),
-    videoId: uuid('movie_id').references(() => videos.id, { onDelete: 'cascade' }),
+    videoId: uuid('video_id').references(() => videos.id, { onDelete: 'cascade' }),
     videoVerId: uuid('movie_version_id').references(() => videoVersions.id, { onDelete: 'cascade' }),
     type: text('type').$type<'info' | 'error' | 'success' | 'warning'>().default('info').notNull(),
     title: text('title').notNull(),

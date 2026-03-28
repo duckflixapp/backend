@@ -16,10 +16,6 @@ export const updateMovieSchema = z.object({
     genreIds: z.preprocess((val) => (typeof val === 'string' ? [val] : val), z.array(z.uuid()).max(10)).optional(),
 });
 
-export const addVersionSchema = z.object({
-    height: z.number().int().positive(),
-});
-
 export const movieQuerySchema = z.object({
     page: z.coerce.number().int().positive().max(10000, 'Page limit exceeded').default(1),
     limit: z.coerce.number().int().positive().max(100).default(20),

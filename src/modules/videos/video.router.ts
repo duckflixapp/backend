@@ -3,6 +3,7 @@ import { movieUpload } from '../../shared/configs/multer.config';
 import { limiterConfigs } from '../../shared/limiters';
 import { hasRole } from '../../shared/middlewares/auth.middleware';
 import * as VideoController from './video.controller';
+import * as VideoVersionsController from './versions.controller';
 import { Router } from 'express';
 
 const router = Router();
@@ -31,8 +32,8 @@ router.get(
         windowMs: 2 * 1000, // 30 per 2s
         limit: 30,
         keyGenerator: limiterConfigs.authenticatedKey,
-    })
-    // MoviesVersionsController.getMany
+    }),
+    VideoVersionsController.getMany
 );
 
 router.post(
@@ -43,8 +44,8 @@ router.post(
         windowMs: 2 * 1000, // 30 per 2s
         limit: 30,
         keyGenerator: limiterConfigs.authenticatedKey,
-    })
-    // MoviesVersionsController.addVersion
+    }),
+    VideoVersionsController.addVersion
 );
 
 router.delete(
@@ -55,8 +56,8 @@ router.delete(
         windowMs: 2 * 1000, // 30 per 2s
         limit: 30,
         keyGenerator: limiterConfigs.authenticatedKey,
-    })
-    // MoviesVersionsController.deleteVersion
+    }),
+    VideoVersionsController.deleteVersion
 );
 
 export default router;

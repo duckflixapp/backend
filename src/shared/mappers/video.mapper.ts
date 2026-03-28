@@ -5,6 +5,12 @@ import { env } from '../../env';
 
 const BASE_URL = env.BASE_URL;
 
+export type RichVideo = Video & {
+    versions: VideoVersion[];
+    uploader: { id: string; name: string; role: UserRole; system: boolean } | null;
+    subtitles: Subtitle[];
+};
+
 export const toVideoVersionDTO = (v: VideoVersion): VideoVersionDTO => ({
     id: v.id,
     height: v.height,
@@ -24,13 +30,7 @@ export const toVideoMinDTO = (video: Video): VideoMinDTO => ({
     createdAt: video.createdAt,
 });
 
-export const toVideoDTO = (
-    video: Video & {
-        versions: VideoVersion[];
-        uploader: { id: string; name: string; role: UserRole; system: boolean } | null;
-        subtitles: Subtitle[];
-    }
-): VideoDTO => ({
+export const toVideoDTO = (video: RichVideo): VideoDTO => ({
     ...toVideoMinDTO(video),
     uploader: video.uploader ? toUserMinDTO(video.uploader) : null,
     versions: video.versions.map(toVideoVersionDTO),

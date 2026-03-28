@@ -1,4 +1,4 @@
-import type { VideoMetadata } from '../services/metadata.service';
+import type { VideoMetadata } from '../../../shared/metadata/metadata.service';
 
 export const isVideoMetadata = (data: unknown): data is VideoMetadata => {
     if (!data || typeof data !== 'object') {
@@ -11,7 +11,7 @@ export const isVideoMetadata = (data: unknown): data is VideoMetadata => {
         return false;
     }
 
-    if (!Array.isArray(candidate.genreIds) || !candidate.genreIds.every((id) => typeof id === 'string')) {
+    if (!Array.isArray(candidate.genres) || !candidate.genres.every((genre) => typeof genre === 'string')) {
         return false;
     }
 

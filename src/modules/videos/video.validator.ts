@@ -1,6 +1,7 @@
 import z from 'zod';
 
 export const createVideoSchema = z.object({
+    type: z.enum(['movie']),
     dbUrl: z.url('Invalid DB URL').max(1000).optional().nullable(),
 
     title: z.string().min(1, 'Title is required').max(255, 'Title is too long').optional().nullable(),
@@ -22,10 +23,22 @@ export const createVideoSchema = z.object({
                 if (typeof val === 'string') return [val];
                 return val;
             },
-            z.array(z.uuid('Invalid genre ID')).min(1, 'Select at least one genre').max(10)
+            z.array(z.string('Invalid genre name')).min(1, 'Select at least one genre').max(10)
         )
         .optional()
         .default([]),
+});
+
+export const addVersionSchema = z.object({
+    height: z.number().int().positive(),
+});
+
+export const videoParamsSchema = z.object({
+    id: z.uuid('Invalid video ID format'),
+});
+
+export const videoVersionParamsSchema = videoParamsSchema.extend({
+    versionId: z.uuid('Invalid video version ID format'),
 });
 
 export type CreateVideoInput = z.infer<typeof createVideoSchema>;

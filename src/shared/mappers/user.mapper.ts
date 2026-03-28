@@ -18,8 +18,8 @@ export const toUserDTO = (user: User): UserDTO => ({
 export const toNotificationDTO = (notification: Notification): NotificationDTO => ({
     id: notification.id,
     userId: notification.userId,
-    movieId: notification.movieId,
-    movieVerId: notification.movieVerId,
+    movieId: notification.videoId,
+    movieVerId: notification.videoVerId,
     type: notification.type,
     title: notification.title,
     message: notification.message,

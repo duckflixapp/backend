@@ -1,19 +1,46 @@
 import type { VideoMinDTO } from '@duckflix/shared';
-import { db } from '../../shared/configs/db';
-import { movies, moviesToGenres, videos, type Movie, type Video } from '../../shared/schema';
-import type { VideoMetadata } from './services/metadata.service';
+import { db, type Transaction } from '../../shared/configs/db';
+import { movies, moviesToGenres, videos, type Video } from '../../shared/schema';
+import type { MovieMetadata, VideoMetadata } from '../../shared/metadata/metadata.service';
 import { VideoNotCreatedError } from './video.errors';
-import { AppError } from '../../shared/errors';
 import { toVideoMinDTO } from '../../shared/mappers/video.mapper';
+import { getGenreIds } from '../movies/services/genres.service';
+
+type UploadHandler<T extends VideoMetadata> = (tx: Transaction, video: Video, data: T) => Promise<void>;
+
+const movieUploadHandler: UploadHandler<MovieMetadata> = async (tx, video, data) => {
+    const [movie] = await tx
+        .insert(movies)
+        .values({
+            videoId: video.id,
+            title: data.title,
+            overview: data.overview,
+            bannerUrl: data.bannerUrl,
+            posterUrl: data.posterUrl,
+            rating: data.rating?.toString() ?? null,
+            releaseYear: data.releaseYear,
+        })
+        .returning();
+
+    if (!movie) throw new VideoNotCreatedError();
+
+    const genreIds = await getGenreIds(data.genres);
+    if (genreIds.length > 0) {
+        await tx.insert(moviesToGenres).values(genreIds.map((genreId) => ({ movieId: movie.id, genreId })));
+    }
+};
+
+const uploadHandlers: {
+    [K in VideoMetadata['type']]: UploadHandler<Extract<VideoMetadata, { type: K }>>;
+} = {
+    movie: movieUploadHandler,
+};
 
 export const initiateUpload = async (
-    type: 'movie',
-    data: {
-        userId: string;
-        status: 'downloading' | 'processing';
-    } & VideoMetadata
+    metadata: VideoMetadata,
+    data: { userId: string; status: 'downloading' | 'processing' }
 ): Promise<VideoMinDTO> => {
-    const [video, object] = await db.transaction<[Video, Movie | null]>(async (tx) => {
+    const video = await db.transaction(async (tx) => {
         const [dbVideo] = await tx
             .insert(videos)
             .values({
@@ -25,40 +52,11 @@ export const initiateUpload = async (
 
         if (!dbVideo) throw new VideoNotCreatedError();
 
-        let object: Movie | null = null;
-        if (type == 'movie') {
-            const [movie] = await tx
-                .insert(movies)
-                .values({
-                    videoId: dbVideo.id,
-                    title: data.title,
-                    overview: data.overview,
-                    bannerUrl: data.bannerUrl,
-                    posterUrl: data.posterUrl,
-                    rating: data.rating?.toString() ?? null,
-                    releaseYear: data.releaseYear,
-                })
-                .returning();
+        const handler = uploadHandlers[metadata.type] as UploadHandler<typeof metadata>;
+        await handler(tx, dbVideo, metadata);
 
-            if (!movie) throw new VideoNotCreatedError();
-            object = movie;
-        }
-        return [dbVideo, object];
+        return dbVideo;
     });
 
-    if (type == 'movie') await uploadMovie({ movieId: object!.id, genreIds: data.genreIds });
-
     return toVideoMinDTO(video);
-};
-
-const uploadMovie = async (data: { movieId: string; genreIds: string[] }) => {
-    if (data.genreIds && data.genreIds.length > 0) {
-        const values = data.genreIds.map((genreId) => ({ movieId: data.movieId, genreId: genreId }));
-        await db
-            .insert(moviesToGenres)
-            .values(values)
-            .catch(async (err) => {
-                throw new AppError('Database insert failed for movie genres', { statusCode: 500, cause: err });
-            });
-    }
 };
