@@ -27,12 +27,12 @@ export class SocketServer {
             const userId = socket.data.userId;
             socket.join(`user:${userId}`);
 
-            socket.on('movie:join', (movieId: string) => {
-                if (movieId) socket.join(`movie:${movieId}`);
+            socket.on('video:join', (videoId: string) => {
+                if (videoId) socket.join(`video:${videoId}`);
             });
 
-            socket.on('movie:leave', (movieId: string) => {
-                if (movieId) socket.leave(`movie:${movieId}`);
+            socket.on('video:leave', (videoId: string) => {
+                if (videoId) socket.leave(`video:${videoId}`);
             });
         });
 

@@ -52,5 +52,5 @@ export const notifyJobStatus = async (
         .values(values)
         .catch((err) => logger.error({ err, userId, videoId, status }, 'Failed to save notification to database'));
 
-    targetIds.forEach((id) => notifyUser(id, { videoId, videoVerId, status, title, message }));
+    targetIds.forEach((id) => notifyUser(id, { videoId: videoId ?? null, videoVerId: videoVerId ?? null, status, title, message }));
 };

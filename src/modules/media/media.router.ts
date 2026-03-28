@@ -23,8 +23,8 @@ const limiterSubtitle = rateLimit({
 router.get('/stream/:versionId{/:file}', limiterStream, MediaController.stream);
 router.get('/subtitle/:subtitleId', limiterSubtitle, MediaController.subtitle);
 
-router.get('/live/:movieId/master.m3u8', LiveMediaController.getLiveMaster);
-router.get('/live/:movieId/:height/index.m3u8', LiveMediaController.getLiveManifest);
-router.get('/live/:movieId/:height/:segmentName', LiveMediaController.getLiveSegment);
+router.get('/live/:videoId/master.m3u8', LiveMediaController.getLiveMaster);
+router.get('/live/:videoId/:height/index.m3u8', LiveMediaController.getLiveManifest);
+router.get('/live/:videoId/:height/:segmentName', LiveMediaController.getLiveSegment);
 
 export default router;

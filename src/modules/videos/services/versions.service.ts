@@ -1,4 +1,4 @@
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '../../../shared/configs/db';
 import { videos, videoVersions } from '../../../shared/schema';
 import { MovieNotFoundError, OriginalMovieVersionNotFoundError } from '../../movies/movies.errors';
@@ -12,8 +12,16 @@ import { taskHandler } from '../../../shared/utils/taskHandler';
 import { taskRegistry } from '../../../shared/utils/taskRegistry';
 
 export const getAllVideoVersions = async (videoId: string) => {
-    const results = await db.query.videoVersions.findMany({
-        where: eq(videoVersions.videoId, videoId),
+    const results = await db.transaction(async (tx) => {
+        const [video] = await tx
+            .select({ exists: sql<number>`1` })
+            .from(videos)
+            .where(eq(videos.id, videoId));
+        if (!video) throw new AppError('Video not found', { statusCode: 404 });
+
+        return tx.query.videoVersions.findMany({
+            where: eq(videoVersions.videoId, videoId),
+        });
     });
 
     return results.map(toVideoVersionDTO);

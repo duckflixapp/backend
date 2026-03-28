@@ -159,7 +159,11 @@ export const videosRelations = relations(videos, ({ one, many }) => ({
         fields: [videos.uploaderId],
         references: [users.id],
     }),
-    movies: one(movies),
+    movie: one(movies, {
+        fields: [videos.id],
+        references: [movies.videoId],
+        relationName: 'movie_video',
+    }),
     versions: many(videoVersions),
     subtitles: many(subtitles),
 }));
@@ -168,6 +172,7 @@ export const moviesRelations = relations(movies, ({ one, many }) => ({
     video: one(videos, {
         fields: [movies.videoId],
         references: [videos.id],
+        relationName: 'movie_video',
     }),
     genres: many(moviesToGenres),
 }));

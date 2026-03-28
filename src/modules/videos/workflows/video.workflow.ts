@@ -2,7 +2,7 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 import { eq } from 'drizzle-orm';
 import { db } from '../../../shared/configs/db';
-import { movies, videos, videoVersions } from '../../../shared/schema';
+import { videos, videoVersions } from '../../../shared/schema';
 import { InvalidVideoFileError } from '../video.errors';
 import { randomUUID } from 'node:crypto';
 import { ffprobe } from '../../../shared/video';
@@ -83,7 +83,7 @@ export const processVideoWorkflow = async (data: {
                 mimeType,
                 status: 'ready',
             });
-            await tx.update(videos).set({ duration, status: 'ready' }).where(eq(movies.id, data.videoId));
+            await tx.update(videos).set({ duration, status: 'ready' }).where(eq(videos.id, data.videoId));
         });
         notifyJobStatus(data.userId, 'completed', `Upload completed`, `Video uploaded successfully`, data.videoId).catch(() => {});
     } catch (e) {

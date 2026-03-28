@@ -67,7 +67,7 @@ export const getMovies = async (options: {
                 video: {
                     with: {
                         uploader: {
-                            with: {
+                            columns: {
                                 id: true,
                                 name: true,
                                 role: true,
@@ -203,31 +203,7 @@ export const getMovieById = async (id: string, options: { userId: string | null 
         inLibrary = !!libraryCount?.value && libraryCount?.value > 0;
     }
 
-    const dto = toMovieDetailedDTO(result, inLibrary);
-
-    const video = result.video;
-    const original = video.versions.find((v) => v.isOriginal);
-    if (original && video.duration) {
-        const livePresets = [2160, 1440, 1080, 720, 480];
-        const existingHeights = video.versions.filter((v) => v.status === 'ready').map((v) => v.height);
-
-        const liveVersions: VideoVersionDTO[] = livePresets
-            .filter((h) => h <= original.height && !existingHeights.includes(h))
-            .map((h) => ({
-                id: `live-${h}`,
-                height: h,
-                width: Math.round(((original.width ?? 1920) * h) / original.height / 2) * 2,
-                mimeType: 'application/x-mpegURL',
-                streamUrl: `${env.BASE_URL}/media/live/${id}/${h}/index.m3u8`,
-                status: 'ready',
-                isOriginal: false,
-                fileSize: null,
-            }));
-
-        dto.video.generatedVersions = liveVersions;
-    }
-
-    return dto;
+    return toMovieDetailedDTO(result, inLibrary);
 };
 
 export const getFeatured = async (options: { userId: string | null } = { userId: null }) => {

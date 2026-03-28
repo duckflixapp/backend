@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { catchAsync } from '../../shared/utils/catchAsync';
-import { createVideoSchema } from './video.validator';
+import { createVideoSchema, videoParamsSchema } from './video.validator';
 import { AppError } from '../../shared/errors';
 import { identifyVideoWorkflow } from './workflows/identify.workflow';
 import * as VideoService from './video.service';
@@ -61,4 +61,20 @@ export const upload = catchAsync(async (req: Request, res: Response) => {
         message: torrentFile ? 'Torrent download initiated.' : 'Video processing started.',
         data: { video },
     });
+});
+
+export const getVideo = catchAsync(async (req: Request, res: Response) => {
+    const { id } = videoParamsSchema.parse(req.params);
+
+    const video = await VideoService.getVideoById(id);
+
+    res.status(200).json({ status: 'success', data: { video } });
+});
+
+export const resolveVideo = catchAsync(async (req: Request, res: Response) => {
+    const { id } = videoParamsSchema.parse(req.params);
+
+    const content = await VideoService.resolveVideo(id);
+
+    res.status(200).json({ status: 'success', data: { content } });
 });

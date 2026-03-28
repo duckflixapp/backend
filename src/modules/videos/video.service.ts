@@ -1,10 +1,13 @@
-import type { VideoMinDTO } from '@duckflix/shared';
+import type { VideoDTO, VideoMinDTO, VideoResolved, VideoVersionDTO } from '@duckflix/shared';
 import { db, type Transaction } from '../../shared/configs/db';
 import { movies, moviesToGenres, videos, type Video } from '../../shared/schema';
 import type { MovieMetadata, VideoMetadata } from '../../shared/metadata/metadata.service';
-import { VideoNotCreatedError } from './video.errors';
-import { toVideoMinDTO } from '../../shared/mappers/video.mapper';
+import { VideoNotCreatedError, VideoNotFoundError } from './video.errors';
+import { toVideoDTO, toVideoMinDTO } from '../../shared/mappers/video.mapper';
 import { getGenreIds } from '../movies/services/genres.service';
+import { eq } from 'drizzle-orm';
+import { AppError } from '../../shared/errors';
+import { env } from '../../env';
 
 type UploadHandler<T extends VideoMetadata> = (tx: Transaction, video: Video, data: T) => Promise<void>;
 
@@ -59,4 +62,69 @@ export const initiateUpload = async (
     });
 
     return toVideoMinDTO(video);
+};
+
+export const getVideoById = async (videoId: string): Promise<VideoDTO> => {
+    const video = await db.query.videos.findFirst({
+        where: eq(videos.id, videoId),
+        with: {
+            versions: true,
+            subtitles: true,
+            uploader: {
+                columns: {
+                    id: true,
+                    name: true,
+                    role: true,
+                    system: true,
+                },
+            },
+        },
+    });
+
+    if (!video) throw new VideoNotFoundError();
+
+    const dto = toVideoDTO(video);
+
+    const original = video.versions.find((v) => v.isOriginal);
+    if (original && video.duration) {
+        const livePresets = [2160, 1440, 1080, 720, 480];
+        const existingHeights = video.versions.filter((v) => v.status === 'ready').map((v) => v.height);
+
+        const liveVersions: VideoVersionDTO[] = livePresets
+            .filter((h) => h <= original.height && !existingHeights.includes(h))
+            .map((h) => ({
+                id: `live-${h}`,
+                height: h,
+                width: Math.round(((original.width ?? 1920) * h) / original.height / 2) * 2,
+                mimeType: 'application/x-mpegURL',
+                streamUrl: `${env.BASE_URL}/media/live/${videoId}/${h}/index.m3u8`,
+                status: 'ready',
+                isOriginal: false,
+                fileSize: null,
+            }));
+
+        dto.generatedVersions = liveVersions;
+    }
+
+    return dto;
+};
+
+export const resolveVideo = async (videoId: string): Promise<VideoResolved> => {
+    const video = await db.query.videos.findFirst({
+        where: eq(videos.id, videoId),
+        columns: { id: true },
+        with: {
+            movie: {
+                columns: {
+                    id: true,
+                },
+            },
+        },
+    });
+
+    if (!video) throw new VideoNotFoundError();
+
+    if (video.movie) return { type: 'movie', contentId: video.movie.id };
+
+    throw new AppError('Content not found', { statusCode: 404 });
 };

@@ -25,6 +25,28 @@ router.post(
 );
 
 router.get(
+    '/:id',
+    rateLimit({
+        ...limiterConfigs.defaults(),
+        windowMs: 2 * 1000, // 20 per 30s
+        limit: 30,
+        keyGenerator: limiterConfigs.authenticatedKey,
+    }),
+    VideoController.getVideo
+);
+
+router.get(
+    '/:id/resolve',
+    rateLimit({
+        ...limiterConfigs.defaults(),
+        windowMs: 2 * 1000, // 20 per 30s
+        limit: 30,
+        keyGenerator: limiterConfigs.authenticatedKey,
+    }),
+    VideoController.resolveVideo
+);
+
+router.get(
     '/:id/versions/',
     hasRole('contributor'),
     rateLimit({

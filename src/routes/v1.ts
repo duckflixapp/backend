@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import authRouter from '../modules/auth/auth.router';
+import videoRouter from '../modules/videos/video.router';
 import movieRouter from '../modules/movies/movies.router';
 import usersRouter from '../modules/users/user.router';
 import libraryRouter from '../modules/library/library.router';
@@ -15,6 +16,8 @@ router.use('/health', healthRouter);
 
 router.use('/auth', authRouter); // can use csrf guard later myb...
 router.use('/users', usersRouter);
+
+router.use('/videos', authenticate(), videoRouter);
 
 router.use('/library', authenticate(), libraryRouter);
 
