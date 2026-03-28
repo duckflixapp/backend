@@ -1,0 +1,24 @@
+import { db } from '../../../configs/db';
+import { logger } from '../../../configs/logger';
+import { notifications } from '../../../schema';
+import type { NotificationChannel, NotificationEvent } from '../notification.types';
+
+export class DatabaseChannel implements NotificationChannel {
+    async send(senderId: string, events: NotificationEvent[]): Promise<void> {
+        if (events.length == 0) return;
+
+        const values = events.map((event) => ({
+            userId: event.userId,
+            type: event.type,
+            title: event.title,
+            message: event.message,
+            videoId: event.videoId,
+            videoVerId: event.videoVerId,
+        }));
+
+        await db
+            .insert(notifications)
+            .values(values)
+            .catch((err) => logger.error({ err, senderId }, 'Failed to save notification to database'));
+    }
+}

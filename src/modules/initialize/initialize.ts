@@ -2,7 +2,7 @@ import { db } from '../../shared/configs/db';
 import { users } from '../../shared/schema';
 import { systemSettings } from '../../shared/services/system.service';
 import { logger } from '../../shared/configs/logger';
-import { checkHardwareDecoding } from '../../shared/video';
+import { checkHardwareDecoding } from '../../shared/services/video';
 import { initializeWatcher } from '../videos/workflows/watcher.workflow';
 import { fetchSystemUserId, setSystemUserId } from '../../shared/configs/system';
 import { recoverZombieMovies, recoverZombieProcesses } from './recovery';

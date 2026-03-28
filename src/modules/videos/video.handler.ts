@@ -5,7 +5,7 @@ import { AppError } from '../../shared/errors';
 import { capitalize } from '../../shared/utils/string';
 import { io } from '../../server';
 import type { DownloadProgress, JobProgress } from '@duckflix/shared';
-import { notifyJobStatus } from '../../shared/services/notification.service';
+import { notifyJobStatus } from '../../shared/services/notifications/notification.helper';
 import { logger } from '../../shared/configs/logger';
 
 export const handleWorkflowError = async (videoId: string, error: unknown, context: 'video' | 'torrent') => {

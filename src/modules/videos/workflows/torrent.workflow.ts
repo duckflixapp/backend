@@ -7,7 +7,7 @@ import { AppError } from '../../../shared/errors';
 import { TorrentClient, validateTorrentFileSize } from '../../../shared/utils/torrent';
 import { RqbitClient } from '../../../shared/lib/rqbit';
 import { emitVideoProgress } from '../video.handler';
-import { notifyJobStatus } from '../../../shared/services/notification.service';
+import { notifyJobStatus } from '../../../shared/services/notifications/notification.helper';
 import { env } from '../../../env';
 import { logger } from '../../../shared/configs/logger';
 import { eq } from 'drizzle-orm';

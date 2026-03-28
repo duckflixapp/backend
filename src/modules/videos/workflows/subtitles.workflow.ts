@@ -8,7 +8,7 @@ import { db } from '../../../shared/configs/db';
 import { subtitles } from '../../../shared/schema';
 import { AppError } from '../../../shared/errors';
 import { logger } from '../../../shared/configs/logger';
-import type { FFprobeData } from '../../../shared/video/src/probe';
+import type { FFprobeData } from '../../../shared/services/video/src/probe';
 import { normalizeLanguage } from '../../../shared/utils/subs';
 import { mapSubtitles, subtitlesClient } from '../services/subs.service';
 import { SubtitleDownloadError } from '../video.errors';

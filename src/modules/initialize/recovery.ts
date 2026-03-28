@@ -2,7 +2,7 @@ import { inArray } from 'drizzle-orm';
 import { db } from '../../shared/configs/db';
 import { videos, videoVersions } from '../../shared/schema';
 import { logger } from '../../shared/configs/logger';
-import { notifyJobStatus } from '../../shared/services/notification.service';
+import { notifyJobStatus } from '../../shared/services/notifications/notification.helper';
 
 export const recoverZombieProcesses = async (systemUserId: string) => {
     const zombies = await db.query.videoVersions.findMany({

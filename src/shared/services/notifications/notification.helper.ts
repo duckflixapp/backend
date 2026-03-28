@@ -1,13 +1,9 @@
-import { db } from '../configs/db';
-import { notifications, users } from '../schema';
-import { io } from '../../server';
-import { logger } from '../configs/logger';
 import { and, eq } from 'drizzle-orm';
-import { getSystemUserId } from '../configs/system';
-
-const notifyUser = (userId: string, data: unknown) => {
-    io.to(`user:${userId}`).emit('notification', data);
-};
+import { db } from '../../configs/db';
+import { getSystemUserId } from '../../configs/system';
+import { users } from '../../schema';
+import { notificationService } from './notification.service';
+import type { NotificationEvent } from './notification.types';
 
 export const notifyJobStatus = async (
     userId: string,
@@ -40,17 +36,12 @@ export const notifyJobStatus = async (
 
     const values = targetIds.map((id) => ({
         userId: id,
-        videoId,
-        videoVerId,
+        videoId: videoId ?? null,
+        videoVerId: videoVerId ?? null,
         type: finalType,
         title,
         message,
-    }));
+    })) satisfies NotificationEvent[];
 
-    await db
-        .insert(notifications)
-        .values(values)
-        .catch((err) => logger.error({ err, userId, videoId, status }, 'Failed to save notification to database'));
-
-    targetIds.forEach((id) => notifyUser(id, { videoId: videoId ?? null, videoVerId: videoVerId ?? null, status, title, message }));
+    notificationService.send(userId, ...values);
 };

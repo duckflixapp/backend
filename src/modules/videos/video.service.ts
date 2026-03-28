@@ -1,7 +1,7 @@
 import type { VideoDTO, VideoMinDTO, VideoResolved, VideoVersionDTO } from '@duckflix/shared';
 import { db, type Transaction } from '../../shared/configs/db';
 import { movies, moviesToGenres, videos, type Video } from '../../shared/schema';
-import type { MovieMetadata, VideoMetadata } from '../../shared/metadata/metadata.service';
+import type { MovieMetadata, VideoMetadata } from '../../shared/services/metadata/metadata.service';
 import { VideoNotCreatedError, VideoNotFoundError } from './video.errors';
 import { toVideoDTO, toVideoMinDTO } from '../../shared/mappers/video.mapper';
 import { getGenreIds } from '../movies/services/genres.service';

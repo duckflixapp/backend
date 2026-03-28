@@ -3,7 +3,7 @@ import { logger } from '../../shared/configs/logger';
 import type { Subprocess } from 'bun';
 import fs from 'node:fs/promises';
 import { taskRegistry } from '../../shared/utils/taskRegistry';
-import { createJitRunner } from '../../shared/video';
+import { createJitRunner } from '../../shared/services/video';
 
 export class SessionTask {
     private process: Subprocess | null = null;

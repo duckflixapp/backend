@@ -1,9 +1,9 @@
-import { AppError } from '../../../shared/errors';
-import { TMDBClient } from '../../../shared/lib/tmdb';
-import { env } from '../../../env';
-import { systemSettings } from '../../../shared/services/system.service';
-import type { SystemSettingsT } from '../../../shared/schema';
-import { logger } from '../../../shared/configs/logger';
+import { AppError } from '../../../../shared/errors';
+import { TMDBClient } from '../../../../shared/lib/tmdb';
+import { env } from '../../../../env';
+import { systemSettings } from '../../../../shared/services/system.service';
+import type { SystemSettingsT } from '../../../../shared/schema';
+import { logger } from '../../../../shared/configs/logger';
 import type { MovieMetadata } from '../metadata.service';
 
 const sysSettings = await systemSettings.get();

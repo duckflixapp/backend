@@ -10,7 +10,7 @@ import { paths } from '../../../shared/configs/path.config';
 import fs from 'node:fs/promises';
 import { taskRegistry } from '../../../shared/utils/taskRegistry';
 import { taskHandler } from '../../../shared/utils/taskHandler';
-import type { VideoMetadata } from '../../../shared/metadata/metadata.service';
+import type { VideoMetadata } from '../../../shared/services/metadata/metadata.service';
 import { getGenreIds } from './genres.service';
 
 const getOrderBy = (orderBy: string | null) => {

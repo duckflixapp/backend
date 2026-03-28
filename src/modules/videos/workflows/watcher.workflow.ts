@@ -6,7 +6,7 @@ import { logger } from '../../../shared/configs/logger';
 import { paths } from '../../../shared/configs/path.config';
 import chokidar from 'chokidar';
 import { handleWorkflowError } from '../video.handler';
-import { notifyJobStatus } from '../../../shared/services/notification.service';
+import { notifyJobStatus } from '../../../shared/services/notifications/notification.helper';
 import { AppError } from '../../../shared/errors';
 import { initiateUpload } from '../video.service';
 
