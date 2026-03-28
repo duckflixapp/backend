@@ -2,6 +2,8 @@ import { parseIdFromUrl } from './providers/imdb.provider';
 import { fillFromIMDBId, fillFromTMDBUrl } from './providers/tmdb.provider';
 import type { CreateVideoInput } from '../../modules/videos/video.validator';
 import type { UpdateMovieInput } from '../../modules/movies/validators/movies.validator';
+import { movieMetadataSchema } from './metadata.validator';
+import { AppError } from '../errors';
 
 export interface MovieMetadata {
     type: 'movie';
@@ -56,12 +58,16 @@ const enrichMovieMetadata: MetadataEnricher<CreateVideoInput, MovieMetadata> = a
         releaseYear: external.releaseYear ?? manual.releaseYear ?? new Date().getFullYear(),
         posterUrl: external.posterUrl ?? manual.posterUrl,
         bannerUrl: external.bannerUrl ?? manual.bannerUrl,
-        genres: external.genres?.length ? external.genres : (manual.genreIds ?? []),
+        genres: external.genres?.length ? external.genres : (manual.genres ?? []),
         imdbId: external.imdbId ?? null,
         rating: external.rating ?? null,
     };
 
-    return metadata;
+    try {
+        return movieMetadataSchema.parse(metadata);
+    } catch (e) {
+        throw new AppError('Failed to fill movie metadata', { statusCode: 500, cause: e });
+    }
 };
 
 export const metadataEnrichers = {
@@ -88,9 +94,10 @@ const enrichMovieUpdateMetadata: MetadataUpdateEnricher<UpdateMovieInput, MovieM
     if (external.releaseYear ?? manual.releaseYear) result.releaseYear = external.releaseYear ?? manual.releaseYear;
     if (external.posterUrl ?? manual.posterUrl) result.posterUrl = external.posterUrl ?? manual.posterUrl;
     if (external.bannerUrl ?? manual.bannerUrl) result.bannerUrl = external.bannerUrl ?? manual.bannerUrl;
-    if (external.genres?.length || manual.genres?.length) result.genres = external.genres?.length ? external.genres : manual.genres;
     if (external.imdbId) result.imdbId = external.imdbId;
     if (external.rating) result.rating = external.rating;
+    if (external.genres?.length || manual.genres?.length)
+        result.genres = external.genres?.length ? external.genres : (manual.genres ?? undefined);
 
     return Object.keys(result).length > 0 ? result : null;
 };

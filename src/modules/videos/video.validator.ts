@@ -17,7 +17,7 @@ export const createVideoSchema = z.object({
     bannerUrl: z.url('Invalid banner URL').max(1000).optional().nullable(),
     posterUrl: z.url('Invalid poster URL').max(1000).optional().nullable(),
 
-    genreIds: z
+    genres: z
         .preprocess(
             (val) => {
                 if (typeof val === 'string') return [val];

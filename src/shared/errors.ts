@@ -33,6 +33,19 @@ export const globalErrorHandler = (err: unknown, req: Request, res: Response, _n
     }
 
     if (err instanceof AppError) {
+        if (!err.statusCode || err.statusCode >= 500) {
+            logger.error(
+                {
+                    path: req.path,
+                    method: req.method,
+                    user: req.user,
+                    ip: req.ip,
+                    userAgent: req.get('user-agent'),
+                    err,
+                },
+                `AppError 500: ${err.message}`
+            );
+        }
         return res.status(err.statusCode ?? 500).json({
             status: err.statusCode && err.statusCode < 500 ? 'fail' : 'error',
             message: err.message,
