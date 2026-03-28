@@ -117,6 +117,7 @@ export const resolveVideo = async (videoId: string): Promise<VideoResolved> => {
             movie: {
                 columns: {
                     id: true,
+                    title: true,
                 },
             },
         },
@@ -124,7 +125,7 @@ export const resolveVideo = async (videoId: string): Promise<VideoResolved> => {
 
     if (!video) throw new VideoNotFoundError();
 
-    if (video.movie) return { type: 'movie', contentId: video.movie.id };
+    if (video.movie) return { type: 'movie', id: video.movie.id, name: video.movie.title };
 
     throw new AppError('Content not found', { statusCode: 404 });
 };

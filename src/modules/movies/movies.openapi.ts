@@ -117,81 +117,6 @@
 
 /**
  * @openapi
- * /movies/upload:
- *   post:
- *     summary: Upload a movie
- *     description: |
- *       Initiates a movie upload workflow. Accepts either a direct video file or a torrent file.
- *       Movie metadata can be enriched automatically by providing a TMDB URL via `dbUrl`,
- *       or entered manually with `title` and `genreIds`.
- *       Processing happens asynchronously — the endpoint returns immediately after initiating the workflow.
- *       Requires at least `contributor` role.
- *     tags: [Movies]
- *     requestBody:
- *       required: true
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             properties:
- *               video:
- *                 type: string
- *                 format: binary
- *                 description: Direct video file upload
- *               torrent:
- *                 type: string
- *                 format: binary
- *                 description: Torrent file to download movie from
- *               dbUrl:
- *                 type: string
- *                 description: TMDB movie URL for automatic metadata enrichment
- *                 example: https://www.themoviedb.org/movie/550
- *               title:
- *                 type: string
- *                 description: Required if dbUrl is not provided
- *               overview:
- *                 type: string
- *               releaseYear:
- *                 type: integer
- *               bannerUrl:
- *                 type: string
- *               posterUrl:
- *                 type: string
- *               genreIds:
- *                 type: array
- *                 items:
- *                   type: string
- *                   format: uuid
- *                 description: Required if dbUrl is not provided
- *     responses:
- *       201:
- *         description: Upload or torrent download initiated
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: success
- *                 message:
- *                   type: string
- *                   example: Video processing started.
- *                 data:
- *                   type: object
- *                   properties:
- *                     movie:
- *                       $ref: '#/components/schemas/Movie'
- *       400:
- *         description: Missing video/torrent file or invalid metadata
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- *       403:
- *         $ref: '#/components/responses/Forbidden'
- */
-
-/**
- * @openapi
  * /movies:
  *   get:
  *     summary: Get paginated list of movies
@@ -254,7 +179,7 @@
  * @openapi
  * /movies/genres:
  *   get:
- *     summary: Get all genres
+ *     summary: Get all movie genres
  *     description: Returns all available genres ordered alphabetically.
  *     tags: [Movies]
  *     responses:
@@ -406,124 +331,6 @@
  *     responses:
  *       204:
  *         description: Movie deleted
- *       404:
- *         $ref: '#/components/responses/NotFound'
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- *       403:
- *         $ref: '#/components/responses/Forbidden'
- *
- * /movies/{id}/versions:
- *   get:
- *     summary: Get all versions of a movie
- *     description: |
- *       Returns all versions of a movie including original, transcoded, and versions
- *       in any status (ready, processing, waiting, canceled, error).
- *       Requires at least `contributor` role.
- *     tags: [Movies]
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *     responses:
- *       200:
- *         description: List of all movie versions
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: success
- *                 data:
- *                   type: object
- *                   properties:
- *                     versions:
- *                       type: array
- *                       items:
- *                         $ref: '#/components/schemas/MovieVersion'
- *       404:
- *         $ref: '#/components/responses/NotFound'
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- *       403:
- *         $ref: '#/components/responses/Forbidden'
- */
-
-/**
- * @openapi
- * /movies/{id}/versions:
- *   post:
- *     summary: Add a new version
- *     description: |
- *       Starts a transcoding job to create a new version of the movie at the specified height.
- *       The height must not exceed the original version's resolution.
- *       Returns 409 if a version at that height already exists or is being processed.
- *       Requires at least `contributor` role.
- *     tags: [Movies]
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [height]
- *             properties:
- *               height:
- *                 type: integer
- *                 example: 1080
- *                 description: Target resolution height in pixels
- *     responses:
- *       201:
- *         description: Transcoding job started
- *       400:
- *         description: Height exceeds original resolution
- *       404:
- *         $ref: '#/components/responses/NotFound'
- *       409:
- *         description: Version at this height already exists or is being processed
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- *       403:
- *         $ref: '#/components/responses/Forbidden'
- *
- * /movies/{id}/versions/{versionId}:
- *   delete:
- *     summary: Delete a version
- *     description: |
- *       Permanently deletes a movie version and its files from storage.
- *       The original version cannot be deleted.
- *       Requires at least `contributor` role.
- *     tags: [Movies]
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *       - in: path
- *         name: versionId
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *     responses:
- *       204:
- *         description: Version deleted
- *       400:
- *         description: Cannot delete original version
  *       404:
  *         $ref: '#/components/responses/NotFound'
  *       401:
