@@ -3,6 +3,9 @@ import { relations, type InferSelectModel } from 'drizzle-orm';
 
 import { videos } from './video.schema';
 
+// ------------------------------------
+// Schema
+// ------------------------------------
 export const series = pgTable('series', {
     id: uuid('id').defaultRandom().primaryKey(),
     title: text('title').notNull(),
@@ -14,7 +17,6 @@ export const series = pgTable('series', {
     lastAirDate: text('last_air_date'),
     status: text('status').$type<'returning' | 'ended' | 'canceled' | 'in_production'>(),
     tmdbId: integer('tmdb_id').unique(),
-    imdbId: text('imdb_id'),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' }).notNull().defaultNow(),
 });
 
@@ -30,7 +32,6 @@ export const seriesSeasons = pgTable(
         overview: text('overview'),
         posterUrl: text('poster_url'),
         airDate: text('air_date'),
-        tmdbId: integer('tmdb_id').unique(),
         createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' }).notNull().defaultNow(),
     },
     (t) => [uniqueIndex('series_season_unique').on(t.seriesId, t.seasonNumber)]
@@ -53,13 +54,12 @@ export const seriesEpisodes = pgTable(
         runtime: integer('runtime'),
         stillUrl: text('still_url'),
         rating: decimal('rating', { precision: 3, scale: 1 }),
-        tmdbId: integer('tmdb_id').unique(),
         createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' }).notNull().defaultNow(),
     },
     (t) => [uniqueIndex('season_episode_unique').on(t.seasonId, t.episodeNumber)]
 );
 
-// genres
+// ----- Genres -----
 export const seriesGenres = pgTable('series_genres', {
     id: uuid('id').defaultRandom().primaryKey(),
     name: text('name').notNull().unique(),

@@ -5,7 +5,7 @@ import { MovieNotFoundError } from '../movies.errors';
 import type { MovieDetailedDTO, MovieDTO, PaginatedResponse } from '@duckflix/shared';
 import { toMovieDetailedDTO, toMovieDTO } from '@shared/mappers/movies.mapper';
 import { AppError } from '@shared/errors';
-import type { VideoMetadata } from '@shared/services/metadata/metadata.service';
+import type { VideoMetadata } from '@shared/services/metadata/metadata.types';
 import { getGenreIds } from './genres.service';
 
 const getOrderBy = (orderBy: string | null) => {

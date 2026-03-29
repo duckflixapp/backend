@@ -1,7 +1,7 @@
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { db } from '@shared/configs/db';
-import type { DownloadProgress } from '@duckflix/shared';
+import type { DownloadProgress, VideoType } from '@duckflix/shared';
 import { paths } from '@shared/configs/path.config';
 import { AppError } from '@shared/errors';
 import { TorrentClient, validateTorrentFileSize } from '@utils/torrent';
@@ -22,7 +22,7 @@ export const processTorrentFileWorkflow = async (data: {
     userId: string;
     videoId: string;
     torrentPath: string;
-    type: 'movie';
+    type: VideoType;
     imdbId: string | null;
 }) => {
     let torrentBuffer: Buffer;

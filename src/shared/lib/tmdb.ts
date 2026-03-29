@@ -1,6 +1,7 @@
 import axios from 'axios';
-import type { TMDBFindByExternalIdResponse, TMDBMovieDetails, TMDBSearchResponse } from '@shared/types/tmdb';
+import type { TMDBFindByExternalIdResponse, TMDBMovieDetails, TMDBSearchResponse } from '@shared/types/movie.tmdb';
 import { AppError } from '@shared/errors';
+import type { TMDBEpisodeDetails } from '@shared/types/episode.tmdb';
 
 export class TMDBMovieDetailsError extends AppError {
     constructor(err: unknown) {
@@ -26,6 +27,12 @@ export class TMDBGenresError extends AppError {
     }
 }
 
+export class TMDBEpisodeDetailsError extends AppError {
+    constructor(err: unknown) {
+        super('Could not fetch TMDB TV Episode API', { statusCode: 500, cause: err });
+    }
+}
+
 export class TMDBClient {
     private readonly api;
     private apiKey;
@@ -47,6 +54,36 @@ export class TMDBClient {
         return true;
     }
 
+    // ----- External IDs -----
+    public async findByExternalId(externalId: string, source: 'imdb_id', language: string = 'en-US') {
+        const { data } = await this.api
+            .get<TMDBFindByExternalIdResponse>(`/find/${externalId}`, {
+                params: {
+                    external_source: source,
+                    language,
+                },
+            })
+            .catch((err) => {
+                throw new TMDBFindExternalError(err);
+            });
+        return data;
+    }
+
+    // ----- Episodes -----
+    public async getEpisodeDetails(seriesId: string, seasonNumber: number, episodeNumber: number, options?: { append: 'external_ids' }) {
+        const { data } = await this.api
+            .get<TMDBEpisodeDetails>(`/tv/${seriesId}/season/${seasonNumber}/episode/${episodeNumber}`, {
+                params: {
+                    append_to_response: options?.append,
+                },
+            })
+            .catch((err) => {
+                throw new TMDBEpisodeDetailsError(err);
+            });
+        return data;
+    }
+
+    // ----- Movies -----
     public async getMovieDetails(movieId: string) {
         const { data } = await this.api.get<TMDBMovieDetails>(`/movie/${movieId}`).catch((err) => {
             throw new TMDBMovieDetailsError(err);
@@ -72,20 +109,6 @@ export class TMDBClient {
             })
             .catch((err) => {
                 throw new TMDBSearchError(err);
-            });
-        return data;
-    }
-
-    public async findByExternalId(externalId: string, source: 'imdb_id', language: string = 'en-US') {
-        const { data } = await this.api
-            .get<TMDBFindByExternalIdResponse>(`/find/${externalId}`, {
-                params: {
-                    external_source: source,
-                    language,
-                },
-            })
-            .catch((err) => {
-                throw new TMDBFindExternalError(err);
             });
         return data;
     }

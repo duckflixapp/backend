@@ -4,8 +4,7 @@ import { env } from '@core/env';
 import { systemSettings } from '@shared/services/system.service';
 import type { SystemSettingsT } from '@schema/system.schema';
 import { logger } from '@shared/configs/logger';
-import type { MovieMetadata } from '../metadata.service';
-import type { VideoType } from '@duckflix/shared';
+import type { EpisodeMetadata, MovieMetadata } from '../metadata.types';
 
 const sysSettings = await systemSettings.get();
 const tmdbClient = new TMDBClient({ baseUrl: env.TMDB_URL, apiKey: sysSettings.external.tmdb.apiKey });
@@ -15,27 +14,77 @@ systemSettings.addListener('update', (settings: SystemSettingsT) => {
     logger.info({ context: 'external_api', service: 'tmdb' }, 'TMDB API Key updated successfully without restart');
 });
 
-const parseIdFromUrl = (url: string): { id: string; type: VideoType } => {
+// ----- IMDB ID -----
+export const fillFromIMDBId = async (imdbId: string) => {
+    const response = await tmdbClient.findByExternalId(imdbId, 'imdb_id');
+    if (response.movie_results[0]) {
+        const movie = response.movie_results[0];
+        if (!movie.id) throw new AppError('TMDB Movie not found', { statusCode: 404 });
+        return fillMovieFromTMDBId(String(movie.id));
+    }
+
+    if (response.tv_episode_results[0]) {
+        const ep = response.tv_episode_results[0];
+        if (!ep.show_id) throw new AppError('TMDB Episode not found', { statusCode: 404 });
+        return fillEpisodeFromTMDBIds(String(ep.show_id), ep.season_number, ep.episode_number);
+    }
+
+    throw new AppError('IMDB Id not found', { statusCode: 404 });
+};
+
+// ----- TMDB URL -----
+const parseIdsFromUrl = (
+    url: string
+): { type: 'movie'; id: string } | { type: 'episode'; seriesId: string; seasonNumber: number; episodeNumber: number } => {
     const movieMatch = url.match(/themoviedb\.org\/movie\/(\d+)/);
-    if (movieMatch && movieMatch[1]) return { id: movieMatch[1], type: 'movie' };
+    if (movieMatch && movieMatch[1]) return { type: 'movie', id: movieMatch[1] };
+
+    const episodeMatch = url.match(/themoviedb\.org\/tv\/(\d+).*?\/season\/(\d+)\/episode\/(\d+)/);
+    if (episodeMatch && episodeMatch[1] && episodeMatch[2] && episodeMatch[3])
+        return {
+            type: 'episode',
+            seriesId: episodeMatch[1],
+            seasonNumber: Number(episodeMatch[2]),
+            episodeNumber: Number(episodeMatch[3]),
+        };
+
     throw new AppError('Invalid TMDB URL', { statusCode: 400 });
 };
 
-export const fillFromTMDBUrl = async (url: string) => {
-    const { id, type } = parseIdFromUrl(url);
+export const fillFromTMDBUrl = async (url: string): Promise<MovieMetadata | EpisodeMetadata | null> => {
+    const data = parseIdsFromUrl(url);
+    const type = data.type;
 
-    if (type == 'movie') return fillMovieFromTMDBId(id);
+    if (type === 'movie') return fillMovieFromTMDBId(data.id);
+    if (type === 'episode') return fillEpisodeFromTMDBIds(data.seriesId, data.seasonNumber, data.episodeNumber);
+
     return null;
 };
 
-export const fillFromIMDBId = async (imdbId: string) => {
-    const response = await tmdbClient.findByExternalId(imdbId, 'imdb_id');
-    const movie = response.movie_results[0];
-    if (!movie || !movie.id) throw new AppError('TMDB Movie not found', { statusCode: 404 });
+// ------------------------------------
+// Episodes
+// ------------------------------------
+export const fillEpisodeFromTMDBIds = async (seriesId: string, seasonNumber: number, episodeNumber: number): Promise<EpisodeMetadata> => {
+    const raw = await tmdbClient.getEpisodeDetails(seriesId, seasonNumber, episodeNumber, { append: 'external_ids' });
 
-    return fillMovieFromTMDBId(String(movie.id));
+    return {
+        type: 'episode',
+        name: raw.name,
+        overview: raw.overview,
+        airDate: new Date(raw.air_date),
+        runtime: raw.runtime,
+        stillUrl: raw.still_path ? `https://image.tmdb.org/t/p/original${raw.still_path}` : undefined,
+        rating: raw.vote_average,
+        imdbId: raw.external_ids?.imdb_id ?? null,
+        tmdbShowId: seriesId,
+        seasonNumber,
+        episodeNumber,
+    };
 };
 
+// ------------------------------------
+// Movies
+// ------------------------------------
 export const fillMovieFromTMDBId = async (id: string): Promise<MovieMetadata> => {
     const raw = await tmdbClient.getMovieDetails(id);
 
@@ -49,8 +98,9 @@ export const fillMovieFromTMDBId = async (id: string): Promise<MovieMetadata> =>
         posterUrl: raw.poster_path ? `https://image.tmdb.org/t/p/w500${raw.poster_path}` : undefined,
         bannerUrl: raw.backdrop_path ? `https://image.tmdb.org/t/p/original${raw.backdrop_path}` : undefined,
         genres: rawGenres,
-        imdbId: raw.imdb_id,
         rating: raw.vote_average,
+        imdbId: raw.imdb_id,
+        tmdbId: String(raw.id),
     };
 };
 

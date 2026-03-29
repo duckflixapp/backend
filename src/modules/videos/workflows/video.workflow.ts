@@ -16,6 +16,7 @@ import { systemSettings } from '@shared/services/system.service';
 import { logger } from '@shared/configs/logger';
 import { downloadSubtitlesWorkflow, extractSubtitlesWorkflow } from './subtitles.workflow';
 import { getStorageStatistics } from '@shared/services/storage.service';
+import type { VideoType } from '@duckflix/shared';
 
 export const processVideoWorkflow = async (data: {
     userId: string;
@@ -23,7 +24,7 @@ export const processVideoWorkflow = async (data: {
     tempPath: string;
     originalName: string;
     fileSize: number;
-    type: 'movie';
+    type: VideoType;
     imdbId: string | null;
 }): Promise<void> => {
     let metadata, fileSize, videoStream;
@@ -92,13 +93,13 @@ export const processVideoWorkflow = async (data: {
         throw new AppError('Video could not be saved in database', { cause: e });
     }
 
-    // Subtitles
+    // ----- Extract Subtitles -----
     await extractSubtitlesWorkflow({ filePath: finalPath, videoId: data.videoId, metadata });
 
-    // - External
+    // ----- Download Subtitles -----
     if (data.imdbId) {
-        const movieHash = await computeHash(finalPath);
-        downloadSubtitlesWorkflow({ videoId: data.videoId, type: data.type, imdbId: data.imdbId, movieHash }).catch((err) => {
+        const hash = await computeHash(finalPath);
+        downloadSubtitlesWorkflow({ videoId: data.videoId, type: data.type, imdbId: data.imdbId, movieHash: hash }).catch((err) => {
             logger.error(
                 {
                     err,

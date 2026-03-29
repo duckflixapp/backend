@@ -2,14 +2,19 @@ import path from 'node:path';
 import { computeHash, subtitlesClient } from '../../services/subs.service';
 import { fillMovieFromTMDBId, searchTMDB } from '@shared/services/metadata/providers/tmdb.provider';
 import { logger } from '@shared/configs/logger';
-import type { MovieMetadata } from '@shared/services/metadata/metadata.service';
+import type { MovieMetadata } from '@shared/services/metadata/metadata.types';
+import { movieMetadataSchema } from '@shared/services/metadata/metadata.validator';
 
 export const identifyMovie = async (filePath: string, fileName?: string, checkHash = true): Promise<MovieMetadata> => {
     if (checkHash) {
         const hash = await computeHash(filePath);
         const tmdbId = await findTmdbIdByHash(hash);
         logger.debug({ filePath, hash, tmdbId }, '[identify:movie] hash lookup');
-        if (tmdbId) return fillMovieFromTMDBId(String(tmdbId));
+
+        if (tmdbId) {
+            const data = await fillMovieFromTMDBId(String(tmdbId));
+            return movieMetadataSchema.parse(data);
+        }
     }
 
     const filename = fileName ?? path.basename(filePath);
@@ -20,9 +25,12 @@ export const identifyMovie = async (filePath: string, fileName?: string, checkHa
     const response = await searchTMDB(parsed);
     logger.debug({ filePath, total: response.total_results }, '[identify:movie] tmdb search');
 
-    if (response.results[0]) return fillMovieFromTMDBId(String(response.results[0].id));
+    if (response.results[0]) {
+        const data = await fillMovieFromTMDBId(String(response.results[0].id));
+        return movieMetadataSchema.parse(data);
+    }
 
-    return { type: 'movie', genres: [], imdbId: null, rating: null, ...parsed };
+    return movieMetadataSchema.parse({ type: 'movie', genres: [], imdbId: null, tmdbId: null, rating: null, ...parsed });
 };
 
 const findTmdbIdByHash = async (hash: string): Promise<number | null> => {

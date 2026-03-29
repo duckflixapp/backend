@@ -74,8 +74,26 @@ export interface TMDBFindMovieResult {
     vote_count: number;
 }
 
+export interface TMDBFindTVEpisodeResult {
+    id: number;
+    name: string;
+    overview: string;
+    media_type: string;
+    vote_average: number;
+    vote_count: number;
+    air_date: string;
+    episode_number: number;
+    episode_type: string;
+    production_code: string;
+    runtime: number;
+    season_number: number;
+    show_id: number;
+    still_path: string;
+}
+
 export interface TMDBFindByExternalIdResponse {
     movie_results: TMDBFindMovieResult[];
+    tv_episode_results: TMDBFindTVEpisodeResult[];
 }
 
 export interface TMDBSearchMovieResult {

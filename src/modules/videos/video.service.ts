@@ -3,7 +3,7 @@ import { db, type Transaction } from '@shared/configs/db';
 import { type Video } from '@shared/schema';
 import { movies, moviesToGenres } from '@shared/schema/movie.schema';
 import { videos } from '@shared/schema/video.schema';
-import type { MovieMetadata, VideoMetadata } from '@shared/services/metadata/metadata.service';
+import type { EpisodeMetadata, MovieMetadata, VideoMetadata } from '@shared/services/metadata/metadata.types';
 import { VideoNotCreatedError, VideoNotFoundError } from './video.errors';
 import { toVideoDTO, toVideoMinDTO } from '@shared/mappers/video.mapper';
 import { getGenreIds } from '@modules/movies/services/genres.service';
@@ -16,6 +16,7 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 import { paths } from '@shared/configs/path.config';
 
+// ----- Video Upload -----
 type UploadHandler<T extends VideoMetadata> = (tx: Transaction, video: Video, data: T) => Promise<void>;
 
 const movieUploadHandler: UploadHandler<MovieMetadata> = async (tx, video, data) => {
@@ -40,10 +41,14 @@ const movieUploadHandler: UploadHandler<MovieMetadata> = async (tx, video, data)
     }
 };
 
-const uploadHandlers: {
-    [K in VideoMetadata['type']]: UploadHandler<Extract<VideoMetadata, { type: K }>>;
-} = {
-    movie: movieUploadHandler,
+const episodeUploadHandler: UploadHandler<EpisodeMetadata> = async (tx, video, data) => {
+    throw new AppError('Not Implemented', { statusCode: 501 });
+};
+
+const uploadHandlerFactory = (metadata: VideoMetadata) => {
+    if (metadata.type === 'movie') return (tx: Transaction, video: Video) => movieUploadHandler(tx, video, metadata);
+    if (metadata.type === 'episode') return (tx: Transaction, video: Video) => episodeUploadHandler(tx, video, metadata);
+    throw new AppError('Upload type not supported', { statusCode: 501 });
 };
 
 export const initiateUpload = async (
@@ -63,14 +68,15 @@ export const initiateUpload = async (
 
         if (!dbVideo) throw new VideoNotCreatedError();
 
-        const handler = uploadHandlers[metadata.type] as UploadHandler<typeof metadata>;
-        await handler(tx, dbVideo, metadata);
+        const handler = uploadHandlerFactory(metadata);
+        await handler(tx, dbVideo);
 
         return dbVideo;
     });
 
     return toVideoMinDTO(video);
 };
+// ----- End Video Upload -----
 
 export const getVideoById = async (videoId: string): Promise<VideoDTO> => {
     const video = await db.query.videos.findFirst({

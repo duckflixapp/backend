@@ -18,8 +18,7 @@ export const upload = catchAsync(async (req: Request, res: Response) => {
     const torrentFile = files?.['torrent']?.[0];
     if (!videoFile && !torrentFile) throw new AppError('Please provide either a valid video or torrent file', { statusCode: 400 });
 
-    const metadataEnrich = MetadataService.metadataEnrichers[type];
-    let metadata = await metadataEnrich(data.dbUrl, data);
+    let metadata = await MetadataService.enrichMetadata(data.dbUrl, data);
 
     if (!metadata && videoFile)
         metadata = await identifyVideoWorkflow({ filePath: videoFile.path, fileName: videoFile.originalname, type });
