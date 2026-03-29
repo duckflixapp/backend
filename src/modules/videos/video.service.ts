@@ -8,6 +8,11 @@ import { getGenreIds } from '../movies/services/genres.service';
 import { eq } from 'drizzle-orm';
 import { AppError } from '../../shared/errors';
 import { env } from '../../env';
+import { taskRegistry } from '../../shared/utils/taskRegistry';
+import { taskHandler } from '../../shared/utils/taskHandler';
+import path from 'node:path';
+import fs from 'node:fs/promises';
+import { paths } from '../../shared/configs/path.config';
 
 type UploadHandler<T extends VideoMetadata> = (tx: Transaction, video: Video, data: T) => Promise<void>;
 
@@ -110,17 +115,33 @@ export const getVideoById = async (videoId: string): Promise<VideoDTO> => {
     return dto;
 };
 
+export const deleteVideoById = async (videoId: string) => {
+    const video = await db.query.videos.findFirst({ where: eq(videos.id, videoId), with: { versions: true } });
+
+    if (!video) throw new VideoNotFoundError();
+
+    if (video.status === 'processing') throw new AppError('Wait until video is processed', { statusCode: 403 });
+    if (video.status === 'downloading') throw new AppError('Wait until video is downloaded', { statusCode: 403 });
+
+    for (const version of video.versions) {
+        if (version.status === 'processing') {
+            await taskRegistry.kill(version.id).catch(() => {});
+        } else if (version.status === 'waiting') {
+            taskHandler.cancel(version.id);
+        }
+    }
+
+    const videoDir = path.resolve(paths.storage, 'videos', video.id);
+    await fs.rm(videoDir, { recursive: true, force: true }).catch(() => {});
+    await db.delete(videos).where(eq(videos.id, video.id));
+};
+
 export const resolveVideo = async (videoId: string): Promise<VideoResolved> => {
     const video = await db.query.videos.findFirst({
         where: eq(videos.id, videoId),
         columns: { id: true, type: true },
         with: {
-            movie: {
-                columns: {
-                    id: true,
-                    title: true,
-                },
-            },
+            movie: { columns: { id: true, title: true } },
         },
     });
 

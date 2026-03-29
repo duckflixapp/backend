@@ -73,6 +73,14 @@ export const getVideo = catchAsync(async (req: Request, res: Response) => {
     res.status(200).json({ status: 'success', data: { video } });
 });
 
+export const deleteVideo = catchAsync(async (req: Request, res: Response) => {
+    const { id } = videoParamsSchema.parse(req.params);
+
+    await VideoService.deleteVideoById(id);
+
+    res.status(204).json({ status: 'success' });
+});
+
 export const resolveVideo = catchAsync(async (req: Request, res: Response) => {
     const { id } = videoParamsSchema.parse(req.params);
 

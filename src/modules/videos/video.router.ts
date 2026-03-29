@@ -35,6 +35,18 @@ router.get(
     VideoController.getVideo
 );
 
+router.delete(
+    '/:id',
+    hasRole('contributor'),
+    rateLimit({
+        ...limiterConfigs.defaults(),
+        windowMs: 2 * 1000, // 20 per 30s
+        limit: 30,
+        keyGenerator: limiterConfigs.authenticatedKey,
+    }),
+    VideoController.deleteVideo
+);
+
 router.get(
     '/:id/resolve',
     rateLimit({

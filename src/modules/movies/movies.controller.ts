@@ -43,16 +43,6 @@ export const getOne = catchAsync(async (req: Request, res: Response) => {
     });
 });
 
-export const deleteOne = catchAsync(async (req: Request, res: Response) => {
-    const { id } = movieParamsSchema.parse(req.params);
-
-    await MoviesService.deleteMovieById(id);
-
-    res.status(204).json({
-        status: 'success',
-    });
-});
-
 export const updateOne = catchAsync(async (req: Request, res: Response) => {
     const { id } = movieParamsSchema.parse(req.params);
     const validatedData = updateMovieSchema.parse(req.body);

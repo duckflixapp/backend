@@ -1,15 +1,10 @@
 import { and, asc, count, desc, eq, exists, ilike, isNotNull, sql } from 'drizzle-orm';
 import { db } from '../../../shared/configs/db';
-import { libraries, libraryItems, movies, moviesToGenres, videos, videoVersions } from '../../../shared/schema';
+import { libraries, libraryItems, movies, moviesToGenres, videoVersions } from '../../../shared/schema';
 import { MovieNotFoundError } from '../movies.errors';
 import type { MovieDetailedDTO, MovieDTO, PaginatedResponse } from '@duckflix/shared';
 import { toMovieDetailedDTO, toMovieDTO } from '../../../shared/mappers/movies.mapper';
 import { AppError } from '../../../shared/errors';
-import path from 'node:path';
-import { paths } from '../../../shared/configs/path.config';
-import fs from 'node:fs/promises';
-import { taskRegistry } from '../../../shared/utils/taskRegistry';
-import { taskHandler } from '../../../shared/utils/taskHandler';
 import type { VideoMetadata } from '../../../shared/services/metadata/metadata.service';
 import { getGenreIds } from './genres.service';
 
@@ -97,38 +92,6 @@ export const getMovies = async (options: {
             currentPage: options.page,
         },
     };
-};
-
-export const deleteMovieById = async (id: string) => {
-    const movie = await db.query.movies.findFirst({
-        where: eq(movies.id, id),
-        with: {
-            video: {
-                with: {
-                    versions: true,
-                },
-            },
-        },
-    });
-
-    if (!movie || !movie.video) throw new MovieNotFoundError();
-    const video = movie.video;
-
-    if (video.status === 'processing') throw new AppError('Wait until video is processed', { statusCode: 403 });
-
-    if (video.status === 'downloading') throw new AppError('Wait until video is downloaded', { statusCode: 403 });
-
-    for (const version of video.versions) {
-        if (version.status === 'processing') {
-            await taskRegistry.kill(version.id).catch(() => {});
-        } else if (version.status === 'waiting') {
-            taskHandler.cancel(version.id);
-        }
-    }
-
-    const videoDir = path.resolve(paths.storage, 'videos', video.id);
-    await fs.rm(videoDir, { recursive: true, force: true }).catch(() => {});
-    await db.delete(videos).where(eq(videos.id, video.id));
 };
 
 export const updateMovieById = async (id: string, data: Partial<VideoMetadata>): Promise<MovieDetailedDTO> => {

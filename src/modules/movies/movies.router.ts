@@ -61,18 +61,6 @@ router.get(
     MoviesController.getOne
 );
 
-router.delete(
-    '/:id',
-    hasRole('contributor'),
-    rateLimit({
-        ...limiterConfigs.defaults(),
-        windowMs: 2 * 1000, // 30 per 2s
-        limit: 30,
-        keyGenerator: limiterConfigs.authenticatedKey,
-    }),
-    MoviesController.deleteOne
-);
-
 router.patch(
     '/:id',
     hasRole('contributor'),
