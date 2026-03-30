@@ -3,6 +3,8 @@ import { relations, type InferSelectModel } from 'drizzle-orm';
 
 import { videos } from './video.schema';
 
+export type SeriesStatus = 'returning' | 'ended' | 'canceled' | 'in_production';
+
 // ------------------------------------
 // Schema
 // ------------------------------------
@@ -15,7 +17,7 @@ export const series = pgTable('series', {
     rating: decimal('rating', { precision: 3, scale: 1 }),
     firstAirDate: text('first_air_date'),
     lastAirDate: text('last_air_date'),
-    status: text('status').$type<'returning' | 'ended' | 'canceled' | 'in_production'>(),
+    status: text('status').$type<SeriesStatus>(),
     tmdbId: integer('tmdb_id').unique(),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' }).notNull().defaultNow(),
 });

@@ -8,6 +8,7 @@ import { processVideoWorkflow } from './workflows/video.workflow';
 import { processTorrentFileWorkflow } from './workflows/torrent.workflow';
 import { handleWorkflowError } from './video.handler';
 import * as MetadataService from '@shared/services/metadata/metadata.service';
+import fs from 'node:fs/promises';
 
 export const upload = catchAsync(async (req: Request, res: Response) => {
     const data = createVideoSchema.parse(req.body);
@@ -16,52 +17,60 @@ export const upload = catchAsync(async (req: Request, res: Response) => {
 
     const videoFile = files?.['video']?.[0];
     const torrentFile = files?.['torrent']?.[0];
+
     if (!videoFile && !torrentFile) throw new AppError('Please provide either a valid video or torrent file', { statusCode: 400 });
 
-    let metadata = await MetadataService.enrichMetadata(data.dbUrl, data);
+    try {
+        let metadata = await MetadataService.enrichMetadata(data.dbUrl, data);
 
-    if (!metadata && videoFile)
-        metadata = await identifyVideoWorkflow({ filePath: videoFile.path, fileName: videoFile.originalname, type });
-    if (!metadata && torrentFile)
-        metadata = await identifyVideoWorkflow(
-            { filePath: torrentFile.path, fileName: torrentFile.originalname, type },
-            { checkHash: false }
-        );
-    if (!metadata)
-        throw new AppError('Failed to retrieve metadata. Please provide valid movie data or db url', {
-            statusCode: 400,
+        if (!metadata && videoFile)
+            metadata = await identifyVideoWorkflow({ filePath: videoFile.path, fileName: videoFile.originalname, type });
+        if (!metadata && torrentFile)
+            metadata = await identifyVideoWorkflow(
+                { filePath: torrentFile.path, fileName: torrentFile.originalname, type },
+                { checkHash: false }
+            );
+        if (!metadata)
+            throw new AppError('Failed to retrieve metadata. Please provide valid movie data or db url', {
+                statusCode: 400,
+            });
+
+        const video = await VideoService.initiateUpload(metadata, {
+            userId: req.user!.id,
+            status: videoFile ? 'processing' : 'downloading',
         });
 
-    const video = await VideoService.initiateUpload(metadata, {
-        userId: req.user!.id,
-        status: videoFile ? 'processing' : 'downloading',
-    });
+        if (videoFile)
+            processVideoWorkflow({
+                userId: req.user!.id,
+                videoId: video.id,
+                type: metadata.type,
+                imdbId: metadata.imdbId,
+                tempPath: videoFile.path,
+                originalName: videoFile.originalname,
+                fileSize: videoFile.size,
+            }).catch((e) => handleWorkflowError(video.id, e, 'video'));
+        else if (torrentFile?.path) {
+            processTorrentFileWorkflow({
+                userId: req.user!.id,
+                videoId: video.id,
+                type: metadata.type,
+                imdbId: metadata.imdbId,
+                torrentPath: torrentFile?.path,
+            }).catch((e) => handleWorkflowError(video.id, e, 'torrent'));
+        } else throw new Error('Please provide valid video file or torrent');
 
-    if (videoFile)
-        processVideoWorkflow({
-            userId: req.user!.id,
-            videoId: video.id,
-            type: metadata.type,
-            imdbId: metadata.imdbId,
-            tempPath: videoFile.path,
-            originalName: videoFile.originalname,
-            fileSize: videoFile.size,
-        }).catch((e) => handleWorkflowError(video.id, e, 'video'));
-    else if (torrentFile?.path) {
-        processTorrentFileWorkflow({
-            userId: req.user!.id,
-            videoId: video.id,
-            type: metadata.type,
-            imdbId: metadata.imdbId,
-            torrentPath: torrentFile?.path,
-        }).catch((e) => handleWorkflowError(video.id, e, 'torrent'));
-    } else throw new Error('Please provide valid video file or torrent');
+        res.status(201).json({
+            status: 'success',
+            message: torrentFile ? 'Torrent download initiated.' : 'Video processing started.',
+            data: { video },
+        });
+    } catch (e) {
+        if (videoFile) await fs.unlink(videoFile.path).catch(() => {});
+        if (torrentFile) await fs.unlink(torrentFile.path).catch(() => {});
 
-    res.status(201).json({
-        status: 'success',
-        message: torrentFile ? 'Torrent download initiated.' : 'Video processing started.',
-        data: { video },
-    });
+        throw e;
+    }
 });
 
 export const getVideo = catchAsync(async (req: Request, res: Response) => {

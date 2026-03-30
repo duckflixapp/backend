@@ -1,6 +1,6 @@
 import type { VideoDTO, VideoMinDTO, VideoResolved, VideoVersionDTO } from '@duckflix/shared';
 import { db, type Transaction } from '@shared/configs/db';
-import { type Video } from '@shared/schema';
+import { series, seriesEpisodes, seriesSeasons, type SeriesStatus, type Video } from '@schema/index';
 import { movies, moviesToGenres } from '@shared/schema/movie.schema';
 import { videos } from '@shared/schema/video.schema';
 import type { EpisodeMetadata, MovieMetadata, VideoMetadata } from '@shared/services/metadata/metadata.types';
@@ -15,6 +15,8 @@ import { taskHandler } from '@utils/taskHandler';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { paths } from '@shared/configs/path.config';
+import { tmdbClient } from '@shared/lib/tmdb';
+import { isDuplicateKey } from '@shared/db.errors';
 
 // ----- Video Upload -----
 type UploadHandler<T extends VideoMetadata> = (tx: Transaction, video: Video, data: T) => Promise<void>;
@@ -42,7 +44,81 @@ const movieUploadHandler: UploadHandler<MovieMetadata> = async (tx, video, data)
 };
 
 const episodeUploadHandler: UploadHandler<EpisodeMetadata> = async (tx, video, data) => {
-    throw new AppError('Not implemented', { statusCode: 501 });
+    const existingSeries = await tx.query.series.findFirst({
+        where: eq(series.tmdbId, data.tmdbShowId),
+        with: {
+            seasons: true,
+        },
+    });
+
+    let seriesId = existingSeries?.id;
+    if (!seriesId) {
+        const raw = await tmdbClient.getSeriesDetails(data.tmdbShowId);
+
+        const allowedStatus: SeriesStatus[] = ['returning', 'ended', 'canceled', 'in_production'] as const;
+        const status = allowedStatus.find((s) => s === raw.status) ?? null;
+
+        const value = {
+            title: raw.name,
+            overview: raw.overview,
+            posterUrl: raw.poster_path ? `https://image.tmdb.org/t/p/w500${raw.poster_path}` : undefined,
+            bannerUrl: raw.backdrop_path ? `https://image.tmdb.org/t/p/original${raw.backdrop_path}` : undefined,
+            rating: raw.vote_average.toString(),
+            firstAirDate: raw.first_air_date,
+            lastAirDate: raw.last_air_date,
+            status,
+            tmdbId: raw.id,
+        };
+
+        const [inserted] = await tx
+            .insert(series)
+            .values(value)
+            .onConflictDoUpdate({ target: series.tmdbId, set: value })
+            .returning({ id: series.id });
+
+        seriesId = inserted!.id;
+    }
+
+    let seasonId = existingSeries?.seasons.find((s) => s.seasonNumber === data.seasonNumber)?.id;
+    if (!seasonId) {
+        const raw = await tmdbClient.getSeasonDetails(data.tmdbShowId, data.seasonNumber);
+
+        const value = {
+            name: raw.name,
+            overview: raw.overview,
+            posterUrl: raw.poster_path ? `https://image.tmdb.org/t/p/w500${raw.poster_path}` : undefined,
+            airDate: raw.air_date,
+            seriesId,
+            seasonNumber: raw.season_number,
+        };
+
+        const [inserted] = await tx
+            .insert(seriesSeasons)
+            .values(value)
+            .onConflictDoUpdate({
+                target: [seriesSeasons.seriesId, seriesSeasons.seasonNumber],
+                set: value,
+            })
+            .returning({ id: seriesSeasons.id });
+
+        seasonId = inserted!.id;
+    }
+
+    try {
+        await tx.insert(seriesEpisodes).values({
+            seasonId,
+            videoId: video.id,
+            episodeNumber: data.episodeNumber,
+            name: data.name,
+            airDate: data.airDate?.toDateString() ?? null,
+            runtime: data.runtime,
+            stillUrl: data.stillUrl,
+            rating: data.rating?.toString() ?? null,
+        });
+    } catch (e) {
+        if (isDuplicateKey(e)) throw new AppError('Episode already exists', { statusCode: 409 });
+        throw e;
+    }
 };
 
 const uploadHandlerFactory = (metadata: VideoMetadata) => {
@@ -150,6 +226,7 @@ export const resolveVideo = async (videoId: string): Promise<VideoResolved> => {
         columns: { id: true, type: true },
         with: {
             movie: { columns: { id: true, title: true } },
+            episode: { columns: { id: true, name: true } },
         },
     });
 
@@ -158,6 +235,11 @@ export const resolveVideo = async (videoId: string): Promise<VideoResolved> => {
     if (video.type == 'movie') {
         if (!video.movie) throw new AppError('Movie record missing for video', { statusCode: 500 });
         return { type: video.type, id: video.movie.id, name: video.movie.title };
+    }
+
+    if (video.type == 'episode') {
+        if (!video.episode) throw new AppError('Episode record missing for video', { statusCode: 500 });
+        return { type: video.type, id: video.episode.id, name: video.episode.name };
     }
 
     throw new AppError('Content not found', { statusCode: 404 });

@@ -10,7 +10,7 @@ export const movieMetadataSchema = z.object({
     genres: z.array(z.string()),
     rating: z.number().nullable(),
     imdbId: z.string().nullable(),
-    tmdbId: z.string().nullable(),
+    tmdbId: z.number().int().positive(),
 });
 
 export const episodeMetadataSchema = z.object({
@@ -22,7 +22,7 @@ export const episodeMetadataSchema = z.object({
     rating: z.number().nullable(),
     stillUrl: z.url().nullable().optional(),
     imdbId: z.string().nullable(),
-    tmdbShowId: z.string().nullable(),
+    tmdbShowId: z.number().int().positive(),
     seasonNumber: z.coerce.number().int().positive(),
     episodeNumber: z.coerce.number().int().positive(),
 });

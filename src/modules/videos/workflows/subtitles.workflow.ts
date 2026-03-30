@@ -112,8 +112,12 @@ export const downloadSubtitlesWorkflow = async (data: { videoId: string; type: V
     const sysSettings = await systemSettings.get();
     const preferences = sysSettings.preferences.subtitles;
 
-    const searchOptions = data.type == 'movie' ? { imdbId: data.imdbId, movieHash: data.movieHash } : {};
+    let searchOptions = {};
+    if (data.type === 'movie') searchOptions = { imdbId: data.imdbId, movieHash: data.movieHash };
+    else if (data.type === 'episode') searchOptions = { imdbId: data.imdbId };
+
     const subtitlesRaw = await subtitlesClient.getSubtitles({
+        type: data.type,
         languages: preferences.map((p) => p.lang),
         ...searchOptions,
     });

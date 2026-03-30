@@ -1,7 +1,11 @@
 import axios from 'axios';
 import type { TMDBFindByExternalIdResponse, TMDBMovieDetails, TMDBSearchResponse } from '@shared/types/movie.tmdb';
 import { AppError } from '@shared/errors';
-import type { TMDBEpisodeDetails } from '@shared/types/episode.tmdb';
+import type { TMDBEpisodeDetails, TMDBSeasonDetails, TMDBSeriesDetails } from '@shared/types/series.tmdb';
+import { systemSettings } from '@shared/services/system.service';
+import { env } from '@core/env';
+import type { SystemSettingsT } from '@schema/system.schema';
+import { logger } from '@shared/configs/logger';
 
 export class TMDBMovieDetailsError extends AppError {
     constructor(err: unknown) {
@@ -69,10 +73,36 @@ export class TMDBClient {
         return data;
     }
 
-    // ----- Episodes -----
-    public async getEpisodeDetails(seriesId: string, seasonNumber: number, episodeNumber: number, options?: { append: 'external_ids' }) {
+    // ----- TV Series -----
+    public async getEpisodeDetails(seriesId: number, seasonNumber: number, episodeNumber: number, options?: { append: 'external_ids' }) {
         const { data } = await this.api
             .get<TMDBEpisodeDetails>(`/tv/${seriesId}/season/${seasonNumber}/episode/${episodeNumber}`, {
+                params: {
+                    append_to_response: options?.append,
+                },
+            })
+            .catch((err) => {
+                throw new TMDBEpisodeDetailsError(err);
+            });
+        return data;
+    }
+
+    public async getSeasonDetails(seriesId: number, seasonNumber: number, options?: { append: 'external_ids' }) {
+        const { data } = await this.api
+            .get<TMDBSeasonDetails>(`/tv/${seriesId}/season/${seasonNumber}`, {
+                params: {
+                    append_to_response: options?.append,
+                },
+            })
+            .catch((err) => {
+                throw new TMDBEpisodeDetailsError(err);
+            });
+        return data;
+    }
+
+    public async getSeriesDetails(seriesId: number, options?: { append: 'external_ids' }) {
+        const { data } = await this.api
+            .get<TMDBSeriesDetails>(`/tv/${seriesId}`, {
                 params: {
                     append_to_response: options?.append,
                 },
@@ -122,3 +152,12 @@ export class TMDBClient {
         return data;
     }
 }
+
+const sysSettings = await systemSettings.get();
+export const tmdbClient = new TMDBClient({ baseUrl: env.TMDB_URL, apiKey: sysSettings.external.tmdb.apiKey });
+
+systemSettings.addListener('update', (settings: SystemSettingsT) => {
+    const updated = tmdbClient.updateCredentials(settings.external.tmdb.apiKey);
+    if (!updated) return;
+    logger.info({ context: 'external_api', service: 'tmdb' }, 'TMDB API Key updated successfully without restart');
+});
