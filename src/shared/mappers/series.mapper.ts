@@ -86,7 +86,7 @@ export const toSeriesDetailedDTO = (
     inUserLibrary?: boolean | null
 ): SeriesDetailedDTO => ({
     ...toSeriesDTO(s),
-    imdbId: s.imdbId ?? null,
+    tmdbId: s.tmdbId ? String(s.tmdbId) : null,
     lastAirDate: s.lastAirDate ?? null,
     inUserLibrary: inUserLibrary ?? null,
 });

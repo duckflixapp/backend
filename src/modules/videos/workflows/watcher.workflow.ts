@@ -12,6 +12,10 @@ import { initiateUpload } from '../video.service';
 
 export const processWatcherWorkflow = async (data: { filePath: string; fileName: string; fileSize: number }, systemUserId: string) => {
     const metadata = await identifyVideoWorkflow({ filePath: data.filePath });
+    if (!metadata) {
+        throw new AppError('[WatcherWorkflow] Video identification failed');
+    }
+
     logger.debug({ fileName: data.fileName, metadata }, '[WatcherWorkflow] Identified video');
 
     const video = await initiateUpload(metadata, {

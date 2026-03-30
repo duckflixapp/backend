@@ -42,7 +42,7 @@ const movieUploadHandler: UploadHandler<MovieMetadata> = async (tx, video, data)
 };
 
 const episodeUploadHandler: UploadHandler<EpisodeMetadata> = async (tx, video, data) => {
-    throw new AppError('Not Implemented', { statusCode: 501 });
+    throw new AppError('Not implemented', { statusCode: 501 });
 };
 
 const uploadHandlerFactory = (metadata: VideoMetadata) => {

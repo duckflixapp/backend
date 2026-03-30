@@ -5,7 +5,7 @@ import { MovieNotFoundError } from '../movies.errors';
 import type { MovieDetailedDTO, MovieDTO, PaginatedResponse } from '@duckflix/shared';
 import { toMovieDetailedDTO, toMovieDTO } from '@shared/mappers/movies.mapper';
 import { AppError } from '@shared/errors';
-import type { VideoMetadata } from '@shared/services/metadata/metadata.types';
+import type { MovieMetadata } from '@shared/services/metadata/metadata.types';
 import { getGenreIds } from './genres.service';
 
 const getOrderBy = (orderBy: string | null) => {
@@ -94,7 +94,7 @@ export const getMovies = async (options: {
     };
 };
 
-export const updateMovieById = async (id: string, data: Partial<VideoMetadata>): Promise<MovieDetailedDTO> => {
+export const updateMovieById = async (id: string, data: Partial<MovieMetadata>): Promise<MovieDetailedDTO> => {
     await db.transaction(async (tx) => {
         const modified = await tx
             .update(movies)
