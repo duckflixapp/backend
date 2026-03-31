@@ -49,10 +49,10 @@ export const toSeasonMinDTO = (season: SeriesSeason & { episodeCount?: number })
     episodeCount: season.episodeCount,
 });
 
-export const toSeasonDTO = (season: SeriesSeason & { episodes: (SeriesEpisode & { video: RichVideo | null })[] }): SeasonDTO => ({
+export const toSeasonDTO = (season: SeriesSeason & { episodes: SeriesEpisode[] }): SeasonDTO => ({
     ...toSeasonMinDTO(season),
     overview: season.overview ?? null,
-    episodes: season.episodes.map(toEpisodeDTO),
+    episodes: season.episodes.map(toEpisodeMinDTO),
 });
 
 // ---- Series ----

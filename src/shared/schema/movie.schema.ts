@@ -17,6 +17,7 @@ export const movies = pgTable('movies', {
     posterUrl: text('poster_url'),
     rating: decimal('rating', { precision: 3, scale: 1 }).default('0.0'),
     releaseYear: integer('release_year'),
+    tmdbId: integer('tmdb_id').unique(),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' }).notNull().defaultNow(),
 });
 

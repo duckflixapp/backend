@@ -3,6 +3,10 @@ import { hasRole } from '@shared/middlewares/auth.middleware';
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 
+import * as EpisodeController from './episode.controller';
+import * as SeasonController from './season.controller';
+import * as SeriesController from './series.controller';
+
 const router = Router();
 
 // ------------------------------------
@@ -15,7 +19,8 @@ router.get(
         windowMs: 3 * 1000, // 45 per 3s
         limit: 45,
         keyGenerator: limiterConfigs.authenticatedKey,
-    })
+    }),
+    SeriesController.getOne
 );
 
 router.delete(
@@ -33,17 +38,18 @@ router.delete(
 // Seasons
 // ------------------------------------
 router.get(
-    '/:seriesId/:seasonId',
+    '/season/:seasonId',
     rateLimit({
         ...limiterConfigs.defaults(),
         windowMs: 3 * 1000, // 45 per 3s
         limit: 45,
         keyGenerator: limiterConfigs.authenticatedKey,
-    })
+    }),
+    SeasonController.getOne
 );
 
 router.delete(
-    '/:seriesId/:seasonId',
+    '/season/:seasonId',
     hasRole('contributor'),
     rateLimit({
         ...limiterConfigs.defaults(),
@@ -57,11 +63,14 @@ router.delete(
 // Episodes
 // ------------------------------------
 router.get(
-    '/:seriesId/:seasonId/:episodeId',
+    '/episodes/:episodeId',
     rateLimit({
         ...limiterConfigs.defaults(),
         windowMs: 3 * 1000, // 45 per 3s
         limit: 45,
         keyGenerator: limiterConfigs.authenticatedKey,
-    })
+    }),
+    EpisodeController.getOne
 );
+
+export default router;

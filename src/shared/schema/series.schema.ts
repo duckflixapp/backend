@@ -97,6 +97,17 @@ export const seriesRelations = relations(series, ({ many }) => ({
     genres: many(seriesToGenres),
 }));
 
+export const seriesTogenresRelations = relations(seriesToGenres, ({ one }) => ({
+    series: one(series, {
+        fields: [seriesToGenres.seriesId],
+        references: [series.id],
+    }),
+    genre: one(seriesGenres, {
+        fields: [seriesToGenres.genreId],
+        references: [seriesGenres.id],
+    }),
+}));
+
 export const seriesSeasonsRelations = relations(seriesSeasons, ({ one, many }) => ({
     series: one(series, {
         fields: [seriesSeasons.seriesId],

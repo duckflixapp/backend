@@ -22,24 +22,30 @@ import { isDuplicateKey } from '@shared/db.errors';
 type UploadHandler<T extends VideoMetadata> = (tx: Transaction, video: Video, data: T) => Promise<void>;
 
 const movieUploadHandler: UploadHandler<MovieMetadata> = async (tx, video, data) => {
-    const [movie] = await tx
-        .insert(movies)
-        .values({
-            videoId: video.id,
-            title: data.title,
-            overview: data.overview,
-            bannerUrl: data.bannerUrl,
-            posterUrl: data.posterUrl,
-            rating: data.rating?.toString() ?? null,
-            releaseYear: data.releaseYear,
-        })
-        .returning();
+    try {
+        const [movie] = await tx
+            .insert(movies)
+            .values({
+                videoId: video.id,
+                title: data.title,
+                overview: data.overview,
+                bannerUrl: data.bannerUrl,
+                posterUrl: data.posterUrl,
+                rating: data.rating?.toString() ?? null,
+                tmdbId: data.tmdbId,
+                releaseYear: data.releaseYear,
+            })
+            .returning({ id: movies.id });
 
-    if (!movie) throw new VideoNotCreatedError();
+        if (!movie) throw new VideoNotCreatedError();
 
-    const genreIds = await getGenreIds(data.genres);
-    if (genreIds.length > 0) {
-        await tx.insert(moviesToGenres).values(genreIds.map((genreId) => ({ movieId: movie.id, genreId })));
+        const genreIds = await getGenreIds(data.genres);
+        if (genreIds.length > 0) {
+            await tx.insert(moviesToGenres).values(genreIds.map((genreId) => ({ movieId: movie.id, genreId })));
+        }
+    } catch (e) {
+        if (isDuplicateKey(e)) throw new AppError('Movie already exists', { statusCode: 409 });
+        throw e;
     }
 };
 
@@ -110,6 +116,7 @@ const episodeUploadHandler: UploadHandler<EpisodeMetadata> = async (tx, video, d
             videoId: video.id,
             episodeNumber: data.episodeNumber,
             name: data.name,
+            overview: data.overview,
             airDate: data.airDate?.toDateString() ?? null,
             runtime: data.runtime,
             stillUrl: data.stillUrl,

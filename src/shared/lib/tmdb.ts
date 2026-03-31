@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import type { TMDBFindByExternalIdResponse, TMDBMovieDetails, TMDBSearchResponse } from '@shared/types/movie.tmdb';
 import { AppError } from '@shared/errors';
 import type { TMDBEpisodeDetails, TMDBSeasonDetails, TMDBSeriesDetails } from '@shared/types/series.tmdb';
@@ -82,6 +82,8 @@ export class TMDBClient {
                 },
             })
             .catch((err) => {
+                if (err instanceof AxiosError && err.response?.status === 404)
+                    throw new AppError('Could not find episode on TMDB', { statusCode: 404 });
                 throw new TMDBEpisodeDetailsError(err);
             });
         return data;
@@ -95,6 +97,9 @@ export class TMDBClient {
                 },
             })
             .catch((err) => {
+                if (err instanceof AxiosError && err.response?.status === 404)
+                    throw new AppError('Could not find season on TMDB', { statusCode: 404 });
+
                 throw new TMDBEpisodeDetailsError(err);
             });
         return data;
@@ -108,6 +113,8 @@ export class TMDBClient {
                 },
             })
             .catch((err) => {
+                if (err instanceof AxiosError && err.response?.status === 404)
+                    throw new AppError('Could not find tv series on TMDB', { statusCode: 404 });
                 throw new TMDBEpisodeDetailsError(err);
             });
         return data;
