@@ -7,8 +7,8 @@ import { AppError } from '@shared/errors';
 import { getStorageStatistics } from '@shared/services/storage.service';
 import { toSystemStatisticsDTO } from '@shared/mappers/system.mapper';
 import { env } from '@core/env';
-import { sessionRegistry } from '@modules/media/live.service';
 import { taskHandler } from '@utils/taskHandler';
+import { liveSessionManager } from '@modules/media/live.service';
 
 export const getUsersWithRoles = async (): Promise<UserDTO[]> => {
     const rolesIncluded = roles.filter((r) => isAtLeast(r, 'watcher'));
@@ -52,7 +52,7 @@ export const getSystemStatistics = async (): Promise<SystemStatisticsDTO> => {
     const uptime = process.uptime();
 
     const sessions = {
-        total: sessionRegistry.size,
+        total: liveSessionManager.size(),
     };
 
     const tasks = {

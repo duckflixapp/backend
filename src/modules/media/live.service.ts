@@ -7,7 +7,14 @@ import { SessionTask } from './sessionTask';
 import path from 'node:path';
 import { paths } from '@shared/configs/path.config';
 import fs from 'node:fs/promises';
-import { AppError } from '@shared/errors';
+
+const sessionRegistry = new Map<string, SessionTask>();
+const sessionRef = new Map<string, number>();
+
+export const liveSessionManager = {
+    size: () => sessionRegistry.size,
+    destroyAll: () => sessionRegistry.values().forEach((s) => s.destroy()),
+};
 
 const livePresets = [
     { name: '2160p', height: 2160, bitrate: 20000000 },
@@ -26,8 +33,7 @@ const masterStream = (v: { streamUrl: string; width: number; height: number; ban
 
 const mediaBase = `${env.BASE_URL}/media`;
 
-const generatedSessions = new Map<string, { videoId: string; storageKey: string; height: number; duration: number }>();
-export const generateMasterFile = async (videoId: string) => {
+export const generateMasterFile = async (videoId: string, session: string) => {
     const video = await db.query.videos.findFirst({ where: eq(videos.id, videoId), with: { versions: true } });
     if (!video) throw new VideoNotFoundError();
 
@@ -36,14 +42,6 @@ export const generateMasterFile = async (videoId: string) => {
 
     const versions = video.versions.filter((v) => v.mimeType === 'application/x-mpegURL').sort((a, b) => b.height - a.height);
     const includedHeights = versions.map((v) => v.height);
-
-    const session = crypto.randomUUID();
-    generatedSessions.set(session, {
-        videoId: video.id,
-        storageKey: original.storageKey,
-        height: original.height,
-        duration: video.duration!,
-    });
 
     let master = `#EXTM3U\n`;
 
@@ -62,6 +60,7 @@ export const generateMasterFile = async (videoId: string) => {
             height: v.height,
             bandwidth: v.height * 2000,
             name: `${v.height}p`,
+            session,
         });
     });
 
@@ -124,11 +123,12 @@ export const generateManifestFile = async (
     return m3u8;
 };
 
-export const sessionRegistry = new Map<string, SessionTask>();
-export const sessionRef = new Map<string, number>();
-export const ensureLiveSegment = async (videoId: string, session: string, height: number, options = { segment: 0, segmentDuration: 6 }) => {
-    const original = generatedSessions.get(session);
-    if (!original || original.videoId !== videoId) throw new AppError('Session not found', { statusCode: 404 });
+export const ensureLiveSegment = async (
+    session: string,
+    height: number,
+    original: { storageKey: string; height: number; duration: number },
+    options = { segment: 0, segmentDuration: 6 }
+) => {
     if (height > original.height) throw new TooBigResolutionError();
     if (!presetHeights.includes(height)) throw new NotStandardResolutionError();
 

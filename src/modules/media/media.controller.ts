@@ -5,20 +5,39 @@ import { db } from '@shared/configs/db';
 import { videoVersions, subtitles } from '@schema/video.schema';
 import { catchAsync } from '@utils/catchAsync';
 import { AppError } from '@shared/errors';
-import { streamParamsSchema, subtitleParamsSchema } from './media.validator';
+import { authQuerySchema, createSessionBodySchema, streamParamsSchema, subtitleParamsSchema } from './media.validator';
 import { paths } from '@shared/configs/path.config';
 import { access } from 'node:fs/promises';
 import constants from 'node:constants';
 import { logger } from '@shared/configs/logger';
+import { createSession } from './session/session.service';
+import { sessionClient } from './session/session.client';
+
+export const sessionCreate = catchAsync(async (req: Request, res: Response) => {
+    const { videoId } = createSessionBodySchema.parse(req.body);
+    const userId = req.user!.id;
+
+    const sessionId = await createSession(userId, videoId);
+
+    res.status(200).json({
+        status: 'success',
+        data: {
+            sessionId,
+        },
+    });
+});
 
 export const stream = catchAsync(async (req: Request, res: Response) => {
     const { versionId, file } = streamParamsSchema.parse(req.params);
+    const { session } = authQuerySchema.parse(req.query);
 
     const version = await db.query.videoVersions.findFirst({ where: eq(videoVersions.id, versionId) });
 
     if (!version) {
         throw new AppError('Video version not found', { statusCode: 404 });
     }
+
+    await sessionClient.validate(session, version.videoId);
 
     const absolutePlaylistPath = path.resolve(paths.storage, version.storageKey);
     const directoryPath = path.dirname(absolutePlaylistPath);
@@ -59,12 +78,15 @@ export const stream = catchAsync(async (req: Request, res: Response) => {
 
 export const subtitle = catchAsync(async (req: Request, res: Response) => {
     const { subtitleId } = subtitleParamsSchema.parse(req.params);
+    const { session } = authQuerySchema.parse(req.query);
 
     const subtitle = await db.query.subtitles.findFirst({ where: eq(subtitles.id, subtitleId) });
 
     if (!subtitle) {
         throw new AppError('Subtitle not found', { statusCode: 404 });
     }
+
+    await sessionClient.validate(session, subtitle.videoId);
 
     const absolutePath = path.resolve(paths.storage, subtitle.storageKey);
 

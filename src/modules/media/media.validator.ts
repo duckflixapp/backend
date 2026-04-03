@@ -20,10 +20,14 @@ export const liveSegmentSchema = z.object({
     segmentName: z.string(),
 });
 
-export const sessionSchema = z.object({
-    session: z.uuid(),
-});
-
 export const subtitleParamsSchema = z.object({
     subtitleId: z.uuid('Invalid subtitle ID format'),
+});
+
+export const authQuerySchema = z.object({
+    session: z.uuid('Invalid session ID'),
+});
+
+export const createSessionBodySchema = z.object({
+    videoId: z.uuid('Invalid video ID'),
 });
