@@ -1,5 +1,5 @@
 import { spawn, type Subprocess } from 'bun';
-import type { JobProgress } from '@duckflix/shared';
+import type { JobProgress } from '@duckflixapp/shared';
 import { EventEmitter } from 'node:events';
 import { taskRegistry, type Interruptible } from '@utils/taskRegistry';
 import { videoDefaults } from './constants';

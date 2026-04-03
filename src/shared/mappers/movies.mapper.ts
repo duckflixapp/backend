@@ -1,6 +1,6 @@
 import { toVideoDTO, type RichVideo } from './video.mapper';
 import type { Genre, Movie } from '@schema/movie.schema';
-import type { MovieDetailedDTO, MovieDTO, MovieMinDTO } from '@duckflix/shared';
+import type { MovieDetailedDTO, MovieDTO, MovieMinDTO } from '@duckflixapp/shared';
 
 type RichMovieWithVideo = Movie & { video: RichVideo } & { genres: { genre: Genre }[] };
 

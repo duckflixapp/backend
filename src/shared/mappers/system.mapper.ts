@@ -1,4 +1,4 @@
-import type { StorageStatisticsDTO, SystemSettingsDTO, SystemStatisticsDTO } from '@duckflix/shared';
+import type { StorageStatisticsDTO, SystemSettingsDTO, SystemStatisticsDTO } from '@duckflixapp/shared';
 import type { SystemSettingsT } from '@schema/system.schema';
 import type { StorageStatistics } from '@shared/services/storage.service';
 

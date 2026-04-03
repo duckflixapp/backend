@@ -1,15 +1,24 @@
-# backend
+# Duckflix Backend
 
-To install dependencies:
+High-performance media streaming backend built with Bun and TypeScript.
 
-```bash
-bun install
-```
+## Tech Stack
 
-To run:
+- **Runtime:** [Bun](https://bun.com/)
+- **Framework:** [Express.js](https://expressjs.com/)
+- **Database:** [PostgreSQL](https://www.postgresql.org/) with [Drizzle ORM](https://orm.drizzle.team/)
+- **Media Processing:** [FFmpeg](https://ffmpeg.org/)
+- **Torrent Client:** [ikatson/rqbit](https://github.com/ikatson/rqbit)
+- **Validation:** [Zod](https://zod.dev/)
+- **Authentication:** [JsonWebToken](https://jwt.io/)
+- **Email:** [Nodemailer](https://nodemailer.com/)
+- **Logging:** [Pino](https://github.com/pinojs/pino)
 
-```bash
-bun run index.ts
-```
+## External APIs
 
-This project was created using `bun init` in bun v1.3.9. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
+- **Metadata:** [TMDB API](https://developer.themoviedb.org/docs/)
+- **Subtitles:** [OpenSubtitles.com](https://www.opensubtitles.com/)
+
+## Setup
+
+See **[BUILDING.md](./BUILDING.md)** for full setup instructions.

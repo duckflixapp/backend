@@ -1,4 +1,4 @@
-import type { UserDTO, UserMinDTO } from '@duckflix/shared';
+import type { UserDTO, UserMinDTO } from '@duckflixapp/shared';
 import type { User } from '@schema/user.schema';
 
 export const toUserMinDTO = (user: Pick<User, 'id' | 'name' | 'role' | 'system'>): UserMinDTO => ({

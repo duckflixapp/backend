@@ -1,4 +1,4 @@
-import type { MovieGenreDTO } from '@duckflix/shared';
+import type { MovieGenreDTO } from '@duckflixapp/shared';
 import { movieGenres } from '@shared/schema/movie.schema';
 import { db } from '@shared/configs/db';
 import { toGenreDTO } from '@shared/mappers/movies.mapper';

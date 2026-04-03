@@ -2,7 +2,7 @@ import { and, asc, count, desc, eq, exists, ilike, isNotNull, sql } from 'drizzl
 import { db } from '@shared/configs/db';
 import { movies, moviesToGenres, videoVersions, libraries, libraryItems } from '@schema/index';
 import { MovieNotFoundError } from '../movies.errors';
-import type { MovieDetailedDTO, MovieDTO, PaginatedResponse } from '@duckflix/shared';
+import type { MovieDetailedDTO, MovieDTO, PaginatedResponse } from '@duckflixapp/shared';
 import { toMovieDetailedDTO, toMovieDTO } from '@shared/mappers/movies.mapper';
 import { AppError } from '@shared/errors';
 import type { MovieMetadata } from '@shared/services/metadata/metadata.types';

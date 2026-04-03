@@ -1,7 +1,7 @@
 import { and, type AnyColumn, asc, desc, eq, exists, inArray, sql } from 'drizzle-orm';
 import { db } from '@shared/configs/db';
 import { seriesToGenres, seriesGenres, series, movieGenres, movies, moviesToGenres } from '@shared/schema';
-import type { SortOrder, SortValue } from '@duckflix/shared';
+import type { SortOrder, SortValue } from '@duckflixapp/shared';
 
 interface SortableTable {
     title: AnyColumn;

@@ -12,7 +12,7 @@ import type { FFprobeData } from '@shared/services/video/src/probe';
 import { normalizeLanguage } from '@utils/subs';
 import { mapSubtitles, subtitlesClient } from '../services/subs.service';
 import { SubtitleDownloadError } from '../video.errors';
-import type { VideoType } from '@duckflix/shared';
+import type { VideoType } from '@duckflixapp/shared';
 
 const SUPPORTED_SUB_CODECS = [
     'subrip', // SRT

@@ -1,4 +1,4 @@
-import type { VideoDTO, VideoMinDTO, VideoResolved, VideoVersionDTO } from '@duckflix/shared';
+import type { VideoDTO, VideoMinDTO, VideoResolved, VideoVersionDTO } from '@duckflixapp/shared';
 import { db, type Transaction } from '@shared/configs/db';
 import { series, seriesEpisodes, seriesGenres, seriesSeasons, seriesToGenres, type SeriesStatus, type Video } from '@schema/index';
 import { movieGenres, movies, moviesToGenres } from '@shared/schema/movie.schema';

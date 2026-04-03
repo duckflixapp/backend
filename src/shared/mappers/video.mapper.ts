@@ -1,4 +1,4 @@
-import type { SubtitleDTO, UserRole, VideoDTO, VideoMinDTO, VideoVersionDTO } from '@duckflix/shared';
+import type { SubtitleDTO, UserRole, VideoDTO, VideoMinDTO, VideoVersionDTO } from '@duckflixapp/shared';
 import type { Subtitle, Video, VideoVersion } from '@schema/video.schema';
 import { toUserMinDTO } from './user.mapper';
 import { env } from '@core/env';

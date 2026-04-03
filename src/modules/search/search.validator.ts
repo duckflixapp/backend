@@ -1,4 +1,4 @@
-import { SORT_ORDER_VALUES, SORT_VALUES } from '@duckflix/shared';
+import { SORT_ORDER_VALUES, SORT_VALUES } from '@duckflixapp/shared';
 import z from 'zod';
 
 export const searchQuerySchema = z.object({

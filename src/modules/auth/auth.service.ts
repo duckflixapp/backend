@@ -5,7 +5,7 @@ import { accountTokens, sessions, users } from '@shared/schema';
 import { libraries } from '@schema/library.schema';
 import { and, eq } from 'drizzle-orm';
 import { EmailAlreadyExistsError, InvalidCredentialsError, UserNotCreatedError } from './auth.errors';
-import type { UserDTO } from '@duckflix/shared';
+import type { UserDTO } from '@duckflixapp/shared';
 import { toUserDTO } from '@shared/mappers/user.mapper';
 import { signToken } from '@utils/jwt';
 import { AppError } from '@shared/errors';

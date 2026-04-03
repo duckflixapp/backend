@@ -9,7 +9,7 @@ import type {
     EpisodeMinDTO,
     EpisodeDTO,
     SeriesGenreDTO,
-} from '@duckflix/shared';
+} from '@duckflixapp/shared';
 import type { RichVideo } from './video.mapper';
 import { toVideoDTO } from './video.mapper';
 

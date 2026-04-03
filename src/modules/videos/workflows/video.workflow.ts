@@ -16,7 +16,7 @@ import { systemSettings } from '@shared/services/system.service';
 import { logger } from '@shared/configs/logger';
 import { downloadSubtitlesWorkflow, extractSubtitlesWorkflow } from './subtitles.workflow';
 import { getStorageStatistics } from '@shared/services/storage.service';
-import type { VideoType } from '@duckflix/shared';
+import type { VideoType } from '@duckflixapp/shared';
 
 export const processVideoWorkflow = async (data: {
     userId: string;

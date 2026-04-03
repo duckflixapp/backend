@@ -6,7 +6,7 @@ import { catchAsync } from '@utils/catchAsync';
 import { AppError } from '@shared/errors';
 import { csrfGuard } from './csrf.middleware';
 import { verifyToken } from '@utils/jwt';
-import { roleHierarchy, type UserRole } from '@duckflix/shared';
+import { roleHierarchy, type UserRole } from '@duckflixapp/shared';
 
 export class UnauthorizedError extends AppError {
     constructor(message: string = 'Unauthorized access') {

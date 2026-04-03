@@ -1,4 +1,4 @@
-import type { PaginatedResponse, ContentDTO, SortOrder, SortValue } from '@duckflix/shared';
+import type { PaginatedResponse, ContentDTO, SortOrder, SortValue } from '@duckflixapp/shared';
 import { movies } from '@schema/movie.schema';
 import { series } from '@schema/series.schema';
 import { and, asc, count, desc, sql } from 'drizzle-orm';

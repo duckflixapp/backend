@@ -2,7 +2,7 @@ import type { VideoMetadata } from '@shared/services/metadata/metadata.types';
 import { identifyMovie } from './identify/movie.strategy';
 import { identifyEpisode } from './identify/episode.strategy';
 import { AppError } from '@shared/errors';
-import type { VideoType } from '@duckflix/shared';
+import type { VideoType } from '@duckflixapp/shared';
 import { logger } from '@shared/configs/logger';
 
 export const identifyVideoWorkflow = async (

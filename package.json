@@ -1,5 +1,5 @@
 {
-    "name": "@duckflix/backend",
+    "name": "@duckflixapp/backend",
     "module": "index.ts",
     "type": "module",
     "private": true,
@@ -11,7 +11,8 @@
         "db:migrate": "drizzle-kit migrate --config drizzle.config.ts",
         "db:generate": "drizzle-kit generate",
         "db:studio": "drizzle-kit studio",
-        "lint": "eslint .",
+        "lint": "eslint . --ext .ts",
+        "format": "prettier --write .",
         "typecheck": "tsc --noEmit --excludeFiles '**/*.test.ts'"
     },
     "devDependencies": {
@@ -27,13 +28,18 @@
         "@types/swagger-ui-express": "^4.1.8",
         "@types/webtorrent": "^0.110.1",
         "drizzle-kit": "^0.31.9",
-        "vite": "^7.3.1"
+            "@typescript-eslint/eslint-plugin": "^8.55.0",
+    "@typescript-eslint/parser": "^8.55.0",
+    "eslint": "^9.10.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.5",
+    "prettier": "^3.8.1"
     },
     "peerDependencies": {
         "typescript": "^5"
     },
     "dependencies": {
-        "@duckflix/shared": "workspace:*",
+        "@duckflixapp/shared": "^0.3.0",
         "argon2": "^0.44.0",
         "axios": "^1.13.5",
         "chokidar": "^5.0.0",

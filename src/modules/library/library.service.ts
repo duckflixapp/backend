@@ -1,4 +1,4 @@
-import type { LibraryDTO, LibraryItemDTO, LibraryMinDTO, PaginatedResponse } from '@duckflix/shared';
+import type { LibraryDTO, LibraryItemDTO, LibraryMinDTO, PaginatedResponse } from '@duckflixapp/shared';
 import { db } from '@shared/configs/db';
 import { libraries, libraryItems, movies, series } from '@schema/index';
 import { and, count, desc, eq, ilike, sql } from 'drizzle-orm';

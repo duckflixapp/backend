@@ -1,4 +1,4 @@
-import type { VideoStatus, VideoType, VideoVersionStatus } from '@duckflix/shared';
+import type { VideoStatus, VideoType, VideoVersionStatus } from '@duckflixapp/shared';
 import { pgTable, uuid, integer, text, timestamp, boolean, bigint } from 'drizzle-orm/pg-core';
 import { relations, type InferSelectModel } from 'drizzle-orm';
 

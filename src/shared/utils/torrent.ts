@@ -5,7 +5,7 @@ import type { RqbitClient } from '@shared/lib/rqbit';
 import { AppError } from '@shared/errors';
 import path from 'node:path';
 import { paths } from '@shared/configs/path.config';
-import type { DownloadProgress } from '@duckflix/shared';
+import type { DownloadProgress } from '@duckflixapp/shared';
 
 const defaultMaxSize = 1024 * 1024 * 2; // 2MB
 export const validateTorrentFileSize = async (torrentPath: string, maxSize: number = defaultMaxSize) => {

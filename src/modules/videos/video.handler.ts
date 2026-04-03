@@ -4,7 +4,7 @@ import { videos, videoVersions } from '@shared/schema/video.schema';
 import { AppError } from '@shared/errors';
 import { capitalize } from '@utils/string';
 import { io } from '@server';
-import type { DownloadProgress, JobProgress } from '@duckflix/shared';
+import type { DownloadProgress, JobProgress } from '@duckflixapp/shared';
 import { notifyJobStatus } from '@shared/services/notifications/notification.helper';
 import { logger } from '@shared/configs/logger';
 

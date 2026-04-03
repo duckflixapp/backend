@@ -1,12 +1,12 @@
 import jwt from 'jsonwebtoken';
 import { env } from '@core/env';
-import type { UserRole } from '@duckflix/shared';
+import type { UserRole } from '@duckflixapp/shared';
 import { limits } from '@shared/configs/limits.config';
 import path from 'node:path';
 import fs from 'node:fs';
 import { logger } from '@shared/configs/logger';
 
-const CERTS_DIR = path.resolve('../../certs');
+const CERTS_DIR = path.resolve('./certs');
 const PRIVATE_KEY_PATH = path.join(CERTS_DIR, 'private.pem');
 const PUBLIC_KEY_PATH = path.join(CERTS_DIR, 'public.pem');
 

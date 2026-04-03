@@ -2,7 +2,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '@shared/configs/db';
 import { users } from '@schema/user.schema';
 import { toUserDTO } from '@shared/mappers/user.mapper';
-import { isAtLeast, roleHierarchy, roles, type SystemStatisticsDTO, type UserDTO, type UserRole } from '@duckflix/shared';
+import { isAtLeast, roleHierarchy, roles, type SystemStatisticsDTO, type UserDTO, type UserRole } from '@duckflixapp/shared';
 import { AppError } from '@shared/errors';
 import { getStorageStatistics } from '@shared/services/storage.service';
 import { toSystemStatisticsDTO } from '@shared/mappers/system.mapper';

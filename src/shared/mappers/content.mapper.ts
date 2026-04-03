@@ -1,4 +1,4 @@
-import type { ContentDTO } from '@duckflix/shared';
+import type { ContentDTO } from '@duckflixapp/shared';
 import type { Movie } from '@schema/movie.schema';
 import type { Series } from '@shared/schema';
 

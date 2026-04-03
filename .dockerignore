@@ -1,0 +1,17 @@
+**/node_modules
+
+**/certs
+*.pem
+
+**/dist/
+**/build/
+**/temp/
+**/storage/
+**/.cache/
+
+*.env.*
+.git
+.gitignore
+.dockerignore
+
+*.md
