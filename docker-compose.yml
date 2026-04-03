@@ -1,0 +1,81 @@
+name: 'duckflix'
+services:
+    postgres:
+        image: postgres:16-alpine
+        container_name: duckflix_db
+        restart: always
+        environment:
+            POSTGRES_USER: duck_admin
+            POSTGRES_PASSWORD: duck_pswd
+            POSTGRES_DB: duckflix_db
+        volumes:
+            - postgres_data:/var/lib/postgresql/data
+        networks:
+            - duckflix_network
+        healthcheck:
+            test: ['CMD-SHELL', 'pg_isready -U duck_admin -d duckflix_db']
+            interval: 5s
+            timeout: 5s
+            retries: 5
+
+    rqbit:
+        image: ikatson/rqbit:latest
+        container_name: duckflix_rqbit
+        restart: always
+        ports:
+            - '3030:3030'
+            - '6881:6881/tcp'
+            - '6881:6881/udp'
+        environment:
+            - RQBIT_HTTP_LISTEN_ADDR=0.0.0.0:3030
+            - RQBIT_DEFAULT_OUTPUT_FOLDER=/home/rqbit/downloads
+        volumes:
+            - rqbit_db:/home/rqbit/db
+            - rqbit_cache:/home/rqbit/cache
+            - ./data/temp/downloads:/home/rqbit/downloads
+        networks:
+            - duckflix_network
+
+    backend:
+        image: ghcr.io/duckflixapp/duckflix:latest
+        container_name: duckflix_backend
+        restart: always
+        init: true
+        depends_on:
+            postgres:
+                condition: service_healthy
+        ports:
+            - '3000:3000'
+        environment:
+            - NODE_ENV=production
+        volumes:
+            - ./data:/app/data
+            - ./logs:/app/logs
+            - ./certs:/app/certs:ro
+        tmpfs:
+            - /app/data/live:size=4G,mode=1777
+        networks:
+            - duckflix_network
+        logging:
+            driver: json-file
+            options:
+                max-size: '10m'
+                max-file: '3'
+
+    frontend:
+        image: ghcr.io/duckflixapp/duckflix-web:latest
+        container_name: duckflix_frontend
+        restart: always
+        ports:
+            - '5173:80'
+        networks:
+            - duckflix_network
+
+networks:
+    duckflix_network:
+        driver: bridge
+
+volumes:
+    postgres_data:
+    rqbit_db:
+    rqbit_cache:

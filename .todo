@@ -1,0 +1,32 @@
+PRIORITY: 
+
+- Series metadata settings
+- Subtitles settings
+
+SYSTEM
+
+- Login ratelimit/account block
+- Upload for multiple video files in torrent?
+- Better upload form. Wizzard-like
+
+DETAILS
+
+- Add metada with dbURL
+- Subtitle search
+
+ADMIN
+
+- Manage Downloads -> torrent downloads and seeding
+- Manage Processes
+
+WATCH
+
+- Seeking on keyboard(canceled reqs)?
+- Cast -> local subtitles, sync media controlls
+- Subtitle opacity
+
+User
+
+- Reset password
+- Edit details
+- 2 FA
