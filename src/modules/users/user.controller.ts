@@ -41,7 +41,5 @@ export const markUserNotifications = catchAsync(async (req: Request, res: Respon
 export const clearUserNotifications = catchAsync(async (req: Request, res: Response) => {
     await UserService.clearUserNotifications(req.user!.id);
 
-    res.status(204).json({
-        status: 'success',
-    });
+    res.sendStatus(204);
 });

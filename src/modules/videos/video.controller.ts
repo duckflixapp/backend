@@ -86,7 +86,7 @@ export const deleteVideo = catchAsync(async (req: Request, res: Response) => {
 
     await VideoService.deleteVideoById(id);
 
-    res.status(204).json({ status: 'success' });
+    res.sendStatus(204);
 });
 
 export const resolveVideo = catchAsync(async (req: Request, res: Response) => {

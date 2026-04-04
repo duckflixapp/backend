@@ -36,7 +36,7 @@ services:
         networks:
             - duckflix_network
 
-    backend:
+    server:
         image: ghcr.io/duckflixapp/duckflix:latest
         container_name: duckflix_backend
         restart: always
@@ -62,9 +62,11 @@ services:
                 max-size: '10m'
                 max-file: '3'
 
-    frontend:
+    web:
         image: ghcr.io/duckflixapp/duckflix-web:latest
         container_name: duckflix_frontend
+        env_file:
+            - .web.env
         restart: always
         ports:
             - '5173:80'

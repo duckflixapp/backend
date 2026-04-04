@@ -25,5 +25,5 @@ export const deleteVersion = catchAsync(async (req: Request, res: Response) => {
 
     await VersionService.deleteVideoVersion(id, versionId);
 
-    res.status(204).json({ status: 'success' });
+    res.sendStatus(204);
 });

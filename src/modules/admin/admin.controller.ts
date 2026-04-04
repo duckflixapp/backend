@@ -46,9 +46,7 @@ export const changeUserRole = catchAsync(async (req: Request, res: Response) => 
 
     await AdminService.changeUserRole(data.email, data.role, { userId: user.id });
 
-    res.status(204).json({
-        status: 'success',
-    });
+    res.sendStatus(204);
 });
 
 export const deleteUser = catchAsync(async (req: Request, res: Response) => {
@@ -57,9 +55,7 @@ export const deleteUser = catchAsync(async (req: Request, res: Response) => {
 
     await AdminService.deleteUser(data.email, { userId: user.id });
 
-    res.status(204).json({
-        status: 'success',
-    });
+    res.sendStatus(204);
 });
 
 export const getSystemStatistics = catchAsync(async (req: Request, res: Response) => {

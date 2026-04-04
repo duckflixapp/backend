@@ -44,7 +44,7 @@ export const removeLibrary = catchAsync(async (req: Request, res: Response) => {
 
     await LibraryService.deleteUserLibrary(userId, libraryId);
 
-    res.status(204).json({ status: 'success' });
+    res.sendStatus(204);
 });
 
 export const getLibraryItems = catchAsync(async (req: Request, res: Response) => {
@@ -64,7 +64,7 @@ export const addContent = catchAsync(async (req: Request, res: Response) => {
 
     await LibraryService.addContentToUserLibrary(userId, libraryId, contentId, type);
 
-    res.status(204).json({ status: 'success' });
+    res.sendStatus(204);
 });
 
 export const removeContent = catchAsync(async (req: Request, res: Response) => {
@@ -74,7 +74,7 @@ export const removeContent = catchAsync(async (req: Request, res: Response) => {
 
     await LibraryService.removeContentFromUserLibrary(userId, libraryId, contentId, type);
 
-    res.status(204).json({ status: 'success' });
+    res.sendStatus(204);
 });
 
 export const getLibrary = catchAsync(async (req: Request, res: Response) => {

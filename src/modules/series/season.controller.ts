@@ -20,7 +20,5 @@ export const deleteOne = catchAsync(async (req: Request, res: Response) => {
 
     await deleteSeasonById({ seasonId, userId });
 
-    res.status(204).json({
-        status: 'success',
-    });
+    res.sendStatus(204);
 });

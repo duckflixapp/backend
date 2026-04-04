@@ -1,12 +1,14 @@
 import rateLimit from 'express-rate-limit';
-import { movieUpload } from '@shared/configs/multer.config';
+import { videoUpload } from '@shared/configs/multer.config';
 import { limiterConfigs } from '@shared/limiters';
 import { hasRole } from '@shared/middlewares/auth.middleware';
 import * as VideoController from './video.controller';
-import * as VideoVersionsController from './versions.controller';
 import { Router } from 'express';
 
-const router = Router();
+import versionsRouter from './versions.router';
+import subtitlesRouter from './subtitles/subtitles.router';
+
+export const router = Router();
 
 router.post(
     '/upload',
@@ -17,7 +19,7 @@ router.post(
         limit: 20,
         keyGenerator: limiterConfigs.authenticatedKey,
     }),
-    movieUpload.fields([
+    videoUpload.fields([
         { name: 'video', maxCount: 1 },
         { name: 'torrent', maxCount: 1 },
     ]),
@@ -58,40 +60,7 @@ router.get(
     VideoController.resolveVideo
 );
 
-router.get(
-    '/:id/versions/',
-    hasRole('contributor'),
-    rateLimit({
-        ...limiterConfigs.defaults(),
-        windowMs: 2 * 1000, // 30 per 2s
-        limit: 30,
-        keyGenerator: limiterConfigs.authenticatedKey,
-    }),
-    VideoVersionsController.getMany
-);
-
-router.post(
-    '/:id/versions',
-    hasRole('contributor'),
-    rateLimit({
-        ...limiterConfigs.defaults(),
-        windowMs: 2 * 1000, // 30 per 2s
-        limit: 30,
-        keyGenerator: limiterConfigs.authenticatedKey,
-    }),
-    VideoVersionsController.addVersion
-);
-
-router.delete(
-    '/:id/versions/:versionId',
-    hasRole('contributor'),
-    rateLimit({
-        ...limiterConfigs.defaults(),
-        windowMs: 2 * 1000, // 30 per 2s
-        limit: 30,
-        keyGenerator: limiterConfigs.authenticatedKey,
-    }),
-    VideoVersionsController.deleteVersion
-);
+router.use('/:id/versions', hasRole('contributor'), versionsRouter);
+router.use('/:videoId/subtitles', hasRole('contributor'), subtitlesRouter);
 
 export default router;

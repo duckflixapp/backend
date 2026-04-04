@@ -64,7 +64,11 @@ export const processVideoWorkflow = async (data: {
 
     try {
         await fs.mkdir(path.dirname(finalPath), { recursive: true });
-        await fs.rename(data.tempPath, finalPath);
+        await fs.rename(data.tempPath, finalPath).catch(async (e) => {
+            if (e.code !== 'EXDEV') throw e; // cross-device
+            await fs.copyFile(data.tempPath, finalPath);
+            await fs.unlink(data.tempPath).catch(() => {});
+        });
     } catch (e) {
         await fs.unlink(data.tempPath).catch(() => {});
         await fs.rm(path.join(paths.storage, 'videos', data.videoId), { recursive: true, force: true }).catch(() => {});

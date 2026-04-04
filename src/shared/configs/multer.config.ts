@@ -4,7 +4,7 @@ import type { Multer } from 'multer';
 import { paths } from './path.config';
 import { limits } from './limits.config';
 
-export const movieUpload: Multer = multer({
+export const videoUpload: Multer = multer({
     dest: paths.uploads,
     limits: {
         fileSize: 1024 * 1024 * limits.file.upload,
@@ -32,5 +32,27 @@ export const movieUpload: Multer = multer({
         }
 
         cb(new AppError('Only video files (mp4, mkv, avi, mov) are allowed', { statusCode: 400 }) as unknown as null, false);
+    },
+});
+
+export const subtitleUpload: Multer = multer({
+    dest: paths.uploads,
+    limits: {
+        fileSize: 1024 * 1024 * 5, // 5MB
+    },
+    fileFilter: (req, file, cb) => {
+        if (file.fieldname !== 'subtitle')
+            return cb(new AppError('Expected field "subtitle".', { statusCode: 400 }) as unknown as null, false);
+
+        const allowed = ['.srt', '.vtt', '.ass', '.ssa', '.sub'];
+        const ext = file.originalname.toLowerCase().slice(file.originalname.lastIndexOf('.'));
+
+        if (!allowed.includes(ext))
+            return cb(
+                new AppError(`Unsupported subtitle format. Allowed: ${allowed.join(', ')}`, { statusCode: 400 }) as unknown as null,
+                false
+            );
+
+        cb(null, true);
     },
 });
