@@ -137,6 +137,7 @@ const episodeUploadHandler: UploadHandler<EpisodeMetadata> = async (tx, video, d
             runtime: data.runtime,
             stillUrl: data.stillUrl,
             rating: data.rating?.toString() ?? null,
+            tmdbId: data.tmdbId,
         });
     } catch (e) {
         if (isDuplicateKey(e)) throw new AppError('Episode already exists', { statusCode: 409 });

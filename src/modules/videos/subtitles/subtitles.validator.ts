@@ -9,5 +9,9 @@ export const subtitleParamsSchema = videoParamsSchema.extend({
 });
 
 export const uploadBodySchema = z.object({
-    language: z.string(),
+    language: z.string().length(2),
+});
+
+export const searchQuerySchema = z.object({
+    language: z.string().length(2),
 });

@@ -28,4 +28,17 @@ router.delete(
     }),
     SubtitlesController.deleteSubtitle
 );
+
+// ----- Search -----
+router.get(
+    '/search',
+    rateLimit({
+        ...limiterConfigs.defaults(),
+        windowMs: 2 * 1000, // 10 per 2s
+        limit: 10,
+        keyGenerator: limiterConfigs.authenticatedKey,
+    }),
+    SubtitlesController.searchSubtitles
+);
+
 export default router;

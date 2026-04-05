@@ -8,9 +8,11 @@ import { paths } from '@shared/configs/path.config';
 import { VideoNotFoundError } from '../video.errors';
 import { randomUUID } from 'crypto';
 import { convertSRTtoVTT } from '@shared/utils/ffmpeg';
-import { toSubtitleDTO } from '@shared/mappers/video.mapper';
+import { toSubtitleDTO, toSubtitleSearchResultDTO } from '@shared/mappers/video.mapper';
 import { ffprobe } from '@shared/services/video';
 import ISO6391 from 'iso-639-1';
+import { subtitlesClient } from '../services/subs.service';
+import type { SubtitleSearchResultDTO } from '@duckflixapp/shared';
 
 const ALLOWED_FORMATS = ['srt', 'webvtt'];
 const ALLOWED_FORMATS_STRING = ALLOWED_FORMATS.join(',');
@@ -60,6 +62,29 @@ export const saveSubtitle = async (data: { videoId: string; tempPath: string; or
         if (e instanceof AppError) throw e;
         throw new AppError('Saving subtitle failed', { cause: e });
     }
+};
+
+export const searchOpenSubtitles = async (data: { videoId: string; language: string }) => {
+    if (!ISO6391.validate(data.language)) throw new AppError('Language code must be in ISO-639-1 standard.', { statusCode: 400 });
+
+    const video = await db.query.videos.findFirst({
+        where: eq(videos.id, data.videoId),
+        with: {
+            episode: true,
+            movie: true,
+        },
+    });
+    if (!video) throw new VideoNotFoundError();
+
+    const subtitlesRaw = await subtitlesClient.getSubtitles({
+        type: video.type,
+        languages: [data.language],
+        tmdbId: (video.movie?.tmdbId || video.episode?.tmdbId) ?? undefined,
+    });
+
+    const subtitles = subtitlesRaw.map(toSubtitleSearchResultDTO).filter((s) => !!s) satisfies SubtitleSearchResultDTO[];
+
+    return subtitles;
 };
 
 export const deleteSubtitleById = async (data: { videoId: string; subtitleId: string }) => {

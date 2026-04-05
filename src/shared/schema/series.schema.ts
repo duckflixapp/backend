@@ -23,15 +23,15 @@ export const series = pgTable(
         tmdbId: integer('tmdb_id').unique(),
         createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' }).notNull().defaultNow(),
     },
-    (t) => ({
-        createdAtIndex: index('series_created_at_idx').on(t.createdAt),
-        ratingIndex: index('series_rating_idx').on(t.rating),
-        ftsIndex: index('series_fts_idx').using(
+    (t) => [
+        index('series_created_at_idx').on(t.createdAt),
+        index('series_rating_idx').on(t.rating),
+        index('series_fts_idx').using(
             'gin',
             sql`(setweight(to_tsvector('english', ${t.title}), 'A') || 
             setweight(to_tsvector('english', coalesce(${t.overview}, '')), 'B'))`
         ),
-    })
+    ]
 );
 
 export const seriesSeasons = pgTable(
@@ -68,6 +68,7 @@ export const seriesEpisodes = pgTable(
         runtime: integer('runtime'),
         stillUrl: text('still_url'),
         rating: decimal('rating', { precision: 3, scale: 1 }),
+        tmdbId: integer('tmdb_id').unique(),
         createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' }).notNull().defaultNow(),
     },
     (t) => [uniqueIndex('season_episode_unique').on(t.seasonId, t.episodeNumber)]

@@ -64,6 +64,7 @@ export const fillEpisodeFromTMDBIds = async (seriesId: number, seasonNumber: num
         stillUrl: raw.still_path ? `https://image.tmdb.org/t/p/original${raw.still_path}` : undefined,
         rating: raw.vote_average,
         imdbId: raw.external_ids?.imdb_id ?? null,
+        tmdbId: raw.id ?? null,
         tmdbShowId: Number(seriesId),
         seasonNumber,
         episodeNumber,

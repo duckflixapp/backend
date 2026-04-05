@@ -73,10 +73,12 @@ export class OpenSubtitlesClient {
         options?: {
             type?: 'movie' | 'episode' | 'all';
             imdbId?: string;
+            tmdbId?: number;
             parentImdbId?: string;
             languages?: string[];
             movieHash?: string;
             page?: number;
+            orderBy?: string;
         },
         further: number = 1
     ): Promise<SubtitleData[]> {
@@ -86,9 +88,10 @@ export class OpenSubtitlesClient {
             .get<SearchSubsResponse>(`/subtitles`, {
                 params: {
                     type: options?.type,
-                    order_by: 'ratings',
+                    order_by: options?.orderBy ?? 'downloads',
                     order_direction: 'desc',
                     imdb_id: options?.imdbId,
+                    tmdb_id: options?.tmdbId,
                     parent_imdb_id: options?.parentImdbId,
                     languages: languagesString,
                     moviehash: options?.movieHash,

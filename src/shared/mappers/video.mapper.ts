@@ -2,6 +2,8 @@ import type { SubtitleDTO, UserRole, VideoDTO, VideoMinDTO, VideoVersionDTO } fr
 import type { Subtitle, Video, VideoVersion } from '@schema/video.schema';
 import { toUserMinDTO } from './user.mapper';
 import { env } from '@core/env';
+import type { SubtitleData } from '@shared/types/opensubs';
+import type { SubtitleSearchResultDTO } from '@modules/videos/subtitles/subtitles.service';
 
 const BASE_URL = env.BASE_URL;
 
@@ -46,3 +48,19 @@ export const toSubtitleDTO = (s: Subtitle): SubtitleDTO => ({
     subtitleUrl: `${BASE_URL}/media/subtitle/${s.id}`,
     createdAt: s.createdAt,
 });
+
+export const toSubtitleSearchResultDTO = (s: SubtitleData): SubtitleSearchResultDTO | null => {
+    const file = s.attributes.files[0];
+    if (!file) return null;
+    return {
+        fileId: file.file_id,
+        fileName: file.file_name,
+        release: s.attributes.release,
+        language: s.attributes.language,
+        downloads: s.attributes.download_count,
+        hearingImpaired: s.attributes.hearing_impaired,
+        aiTranslated: s.attributes.ai_translated,
+        trusted: s.attributes.from_trusted,
+        fps: s.attributes.fps,
+    };
+};

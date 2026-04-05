@@ -23,6 +23,7 @@ export const episodeMetadataSchema = z.object({
     rating: z.number().nullable(),
     stillUrl: z.url().nullable().optional(),
     imdbId: z.string().nullable(),
+    tmdbId: z.number().nullable(),
     tmdbShowId: z.number().int().positive(),
     seasonNumber: z.coerce.number().int().positive(),
     episodeNumber: z.coerce.number().int().positive(),

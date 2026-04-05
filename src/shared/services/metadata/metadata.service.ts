@@ -27,6 +27,7 @@ const enrichEpisodeMetadata = async (external: Partial<EpisodeMetadata>, manual:
             stillUrl: external.stillUrl ?? null,
             rating: external.rating ?? null,
             imdbId: external.imdbId ?? null,
+            tmdbId: external.tmdbId ?? null,
             tmdbShowId: (external.tmdbShowId || manual.seriesId) ?? null,
             seasonNumber: (external.seasonNumber || manual.seasonNumber) ?? null,
             episodeNumber: (external.episodeNumber || manual.episodeNumber) ?? null,
