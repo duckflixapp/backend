@@ -15,3 +15,7 @@ export const uploadBodySchema = z.object({
 export const searchQuerySchema = z.object({
     language: z.string().length(2),
 });
+
+export const importBodySchema = z.object({
+    fileId: z.number().int().positive(),
+});

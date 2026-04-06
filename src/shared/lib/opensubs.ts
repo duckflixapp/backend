@@ -74,6 +74,7 @@ export class OpenSubtitlesClient {
             type?: 'movie' | 'episode' | 'all';
             imdbId?: string;
             tmdbId?: number;
+            fileId?: number;
             parentImdbId?: string;
             languages?: string[];
             movieHash?: string;
@@ -96,6 +97,7 @@ export class OpenSubtitlesClient {
                     languages: languagesString,
                     moviehash: options?.movieHash,
                     moviehash_match: options?.movieHash ? 'only' : undefined,
+                    file_id: options?.fileId,
                     page: options?.page,
                 },
             })

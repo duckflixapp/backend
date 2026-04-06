@@ -12,9 +12,9 @@
         "db:migrate": "drizzle-kit migrate --config drizzle.config.ts",
         "db:generate": "drizzle-kit generate",
         "db:studio": "drizzle-kit studio",
-        "lint": "eslint . --ext .ts",
+        "lint": "eslint ./src --ext .ts",
         "format": "prettier --write .",
-        "typecheck": "tsc --noEmit --excludeFiles '**/*.test.ts'"
+        "typecheck": "tsc --noEmit"
     },
     "devDependencies": {
         "@types/bun": "latest",
@@ -40,7 +40,7 @@
         "typescript": "^5"
     },
     "dependencies": {
-        "@duckflixapp/shared": "^0.4.0",
+        "@duckflixapp/shared": "^0.4.3",
         "argon2": "^0.44.0",
         "axios": "^1.13.5",
         "chokidar": "^5.0.0",

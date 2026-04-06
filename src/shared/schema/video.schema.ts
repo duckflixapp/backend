@@ -38,6 +38,7 @@ export const subtitles = pgTable('subtitles', {
     videoId: uuid('video_id')
         .notNull()
         .references(() => videos.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
     language: text('language').notNull(),
     storageKey: text('storage_key').notNull(),
     externalId: text('external_id'),

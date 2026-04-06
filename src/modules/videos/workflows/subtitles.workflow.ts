@@ -9,10 +9,11 @@ import { subtitles } from '@shared/schema/video.schema';
 import { AppError } from '@shared/errors';
 import { logger } from '@shared/configs/logger';
 import type { FFprobeData } from '@shared/services/video/src/probe';
-import { normalizeLanguage } from '@utils/subs';
+import { createSubtitleName, normalizeLanguage } from '@utils/subs';
 import { mapSubtitles, subtitlesClient } from '../services/subs.service';
 import { SubtitleDownloadError } from '../video.errors';
 import type { VideoType } from '@duckflixapp/shared';
+import { eq } from 'drizzle-orm';
 
 const SUPPORTED_SUB_CODECS = [
     'subrip', // SRT
@@ -80,13 +81,22 @@ export const extractSubtitlesWorkflow = async (data: { filePath: string; videoId
                 continue;
             }
 
-            await db
-                .insert(subtitles)
-                .values({ videoId: data.videoId, language: language, externalId: null, storageKey })
-                .catch(async (err) => {
-                    await fs.unlink(finalPath).catch(() => {});
-                    throw new AppError('Database insert failed for subtitle', { cause: err });
-                });
+            await db.transaction(async (tx) => {
+                const subs = await tx
+                    .select({ language: subtitles.language, name: subtitles.name })
+                    .from(subtitles)
+                    .where(eq(subtitles.videoId, data.videoId));
+
+                const name = createSubtitleName(language, subs);
+
+                await tx
+                    .insert(subtitles)
+                    .values({ videoId: data.videoId, name, language: language, externalId: null, storageKey })
+                    .catch(async (err) => {
+                        await fs.unlink(finalPath).catch(() => {});
+                        throw new AppError('Database insert failed for subtitle', { cause: err });
+                    });
+            });
 
             logger.info(
                 {
@@ -140,13 +150,22 @@ export const downloadSubtitlesWorkflow = async (data: { videoId: string; type: V
             if (!response.ok) throw new SubtitleDownloadError(`Source file fetch failed: ${response.statusText}`);
             await convertSRTtoVTT(response.body, finalPath);
 
-            await db
-                .insert(subtitles)
-                .values({ videoId: data.videoId, language: subtitle.language, externalId: subtitle.id, storageKey })
-                .catch(async (err) => {
-                    await fs.unlink(finalPath).catch(() => {});
-                    throw new AppError('Database insert failed for subtitle', { cause: err });
-                });
+            await db.transaction(async (tx) => {
+                const subs = await tx
+                    .select({ language: subtitles.language, name: subtitles.name })
+                    .from(subtitles)
+                    .where(eq(subtitles.videoId, data.videoId));
+
+                const name = createSubtitleName(subtitle.language, subs);
+
+                await tx
+                    .insert(subtitles)
+                    .values({ videoId: data.videoId, name, language: subtitle.language, externalId: String(file.file_id), storageKey })
+                    .catch(async (err) => {
+                        await fs.unlink(finalPath).catch(() => {});
+                        throw new AppError('Database insert failed for subtitle', { cause: err });
+                    });
+            });
 
             logger.info(
                 {

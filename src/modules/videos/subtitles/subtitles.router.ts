@@ -29,7 +29,7 @@ router.delete(
     SubtitlesController.deleteSubtitle
 );
 
-// ----- Search -----
+// ----- OpenSubtitles -----
 router.get(
     '/search',
     rateLimit({
@@ -39,6 +39,17 @@ router.get(
         keyGenerator: limiterConfigs.authenticatedKey,
     }),
     SubtitlesController.searchSubtitles
+);
+
+router.post(
+    '/import',
+    rateLimit({
+        ...limiterConfigs.defaults(),
+        windowMs: 2 * 1000, // 10 per 2s
+        limit: 10,
+        keyGenerator: limiterConfigs.authenticatedKey,
+    }),
+    SubtitlesController.importSubtitles
 );
 
 export default router;

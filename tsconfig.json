@@ -28,15 +28,15 @@
         "noPropertyAccessFromIndexSignature": false,
 
         // alias
-        "baseUrl": ".",
         "paths": {
-            "@server": ["src/server.ts"],
-            "@core/*": ["src/core/*"],
-            "@shared/*": ["src/shared/*"],
-            "@schema/*": ["src/shared/schema/*"],
-            "@utils/*": ["src/shared/utils/*"],
-            "@types/types/*": ["src/shared/types/*"],
-            "@modules/*": ["src/modules/*"]
+            "@server": ["./src/server.ts"],
+            "@core/*": ["./src/core/*"],
+            "@shared/*": ["./src/shared/*"],
+            "@schema/*": ["./src/shared/schema/*"],
+            "@utils/*": ["./src/shared/utils/*"],
+            "@types/types/*": ["./src/shared/types/*"],
+            "@modules/*": ["./src/modules/*"]
         }
-    }
+    },
+    "exclude": ["data/**", "node_modules"]
 }

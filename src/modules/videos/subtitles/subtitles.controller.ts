@@ -1,7 +1,7 @@
 import { catchAsync } from '@shared/utils/catchAsync';
 import type { Request, Response } from 'express';
-import { searchQuerySchema, subtitleParamsSchema, uploadBodySchema, videoParamsSchema } from './subtitles.validator';
-import { deleteSubtitleById, saveSubtitle, searchOpenSubtitles } from './subtitles.service';
+import { importBodySchema, searchQuerySchema, subtitleParamsSchema, uploadBodySchema, videoParamsSchema } from './subtitles.validator';
+import { deleteSubtitleById, importOpenSubtitles, saveSubtitle, searchOpenSubtitles } from './subtitles.service';
 import { AppError } from '@shared/errors';
 
 export const uploadSubtitle = catchAsync(async (req: Request, res: Response) => {
@@ -36,5 +36,17 @@ export const searchSubtitles = catchAsync(async (req: Request, res: Response) =>
     res.status(200).json({
         status: 'success',
         data: { subtitles },
+    });
+});
+
+export const importSubtitles = catchAsync(async (req: Request, res: Response) => {
+    const { videoId } = videoParamsSchema.parse(req.params);
+    const { fileId } = importBodySchema.parse(req.body);
+
+    const subtitle = await importOpenSubtitles({ videoId, fileId });
+
+    res.status(201).json({
+        status: 'success',
+        data: { subtitle },
     });
 });

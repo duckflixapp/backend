@@ -1,9 +1,8 @@
-import type { SubtitleDTO, UserRole, VideoDTO, VideoMinDTO, VideoVersionDTO } from '@duckflixapp/shared';
+import type { SubtitleDTO, SubtitleSearchResultDTO, UserRole, VideoDTO, VideoMinDTO, VideoVersionDTO } from '@duckflixapp/shared';
 import type { Subtitle, Video, VideoVersion } from '@schema/video.schema';
 import { toUserMinDTO } from './user.mapper';
 import { env } from '@core/env';
 import type { SubtitleData } from '@shared/types/opensubs';
-import type { SubtitleSearchResultDTO } from '@modules/videos/subtitles/subtitles.service';
 
 const BASE_URL = env.BASE_URL;
 
@@ -44,7 +43,9 @@ export const toVideoDTO = (video: RichVideo): VideoDTO => ({
 export const toSubtitleDTO = (s: Subtitle): SubtitleDTO => ({
     id: s.id,
     videoId: s.videoId,
+    name: s.name ?? null,
     language: s.language,
+    externalId: s.externalId,
     subtitleUrl: `${BASE_URL}/media/subtitle/${s.id}`,
     createdAt: s.createdAt,
 });
