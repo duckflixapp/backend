@@ -41,6 +41,7 @@ services:
         container_name: duckflix_backend
         restart: always
         init: true
+        command: sh -c "bun run db:migrate && bun run start"
         depends_on:
             postgres:
                 condition: service_healthy

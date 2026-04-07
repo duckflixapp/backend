@@ -5,7 +5,6 @@
     "version": "0.5.1",
     "private": true,
     "scripts": {
-        "prestart": "bun run db:migrate",
         "start": "bun src/server.ts",
         "dev": "bun --hot src/server.ts",
         "db:push": "drizzle-kit push",
