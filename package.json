@@ -39,7 +39,7 @@
         "typescript": "^5"
     },
     "dependencies": {
-        "@duckflixapp/shared": "^0.4.3",
+        "@duckflixapp/shared": "^0.5.0",
         "argon2": "^0.44.0",
         "axios": "^1.13.5",
         "chokidar": "^5.0.0",

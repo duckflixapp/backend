@@ -2,11 +2,11 @@ import type { VideoDTO, VideoMinDTO, VideoResolved, VideoVersionDTO } from '@duc
 import { db, type Transaction } from '@shared/configs/db';
 import { series, seriesEpisodes, seriesGenres, seriesSeasons, seriesToGenres, type SeriesStatus, type Video } from '@schema/index';
 import { movieGenres, movies, moviesToGenres } from '@shared/schema/movie.schema';
-import { videos } from '@shared/schema/video.schema';
+import { videos, watchHistory } from '@shared/schema/video.schema';
 import type { EpisodeMetadata, MovieMetadata, VideoMetadata } from '@shared/services/metadata/metadata.types';
 import { VideoNotCreatedError, VideoNotFoundError } from './video.errors';
-import { toVideoDTO, toVideoMinDTO } from '@shared/mappers/video.mapper';
-import { eq, inArray } from 'drizzle-orm';
+import { toVideoDTO, toVideoMinDTO, toWatchHistoryDTO } from '@shared/mappers/video.mapper';
+import { and, eq, inArray } from 'drizzle-orm';
 import { AppError } from '@shared/errors';
 import { env } from '@core/env';
 import { taskRegistry } from '@utils/taskRegistry';
@@ -242,6 +242,51 @@ export const deleteVideoById = async (videoId: string) => {
     const videoDir = path.resolve(paths.storage, 'videos', video.id);
     await fs.rm(videoDir, { recursive: true, force: true }).catch(() => {});
     await db.delete(videos).where(eq(videos.id, video.id));
+};
+
+export const getVideoProgressById = async (data: { videoId: string; userId: string }) => {
+    const [video] = await db
+        .select({ id: videos.id, history: watchHistory })
+        .from(videos)
+        .where(eq(videos.id, data.videoId))
+        .leftJoin(watchHistory, and(eq(watchHistory.videoId, data.videoId), eq(watchHistory.userId, data.userId)));
+
+    if (!video) throw new VideoNotFoundError();
+
+    if (!video.history) return null;
+
+    return toWatchHistoryDTO(video.history);
+};
+
+export const saveVideoProgressById = async (data: { videoId: string; userId: string; positionSec: number }) => {
+    const [video] = await db.select({ id: videos.id, duration: videos.duration }).from(videos).where(eq(videos.id, data.videoId));
+    if (!video) throw new VideoNotFoundError();
+
+    // in future implement ffmpeg logic to find intro and outro
+    const isFinished = video.duration ? data.positionSec > video.duration * 0.95 : false;
+
+    const [result] = await db
+        .insert(watchHistory)
+        .values({
+            userId: data.userId,
+            videoId: data.videoId,
+            lastPosition: data.positionSec,
+            isFinished,
+            updatedAt: new Date().toISOString(),
+        })
+        .onConflictDoUpdate({
+            target: [watchHistory.userId, watchHistory.videoId],
+            set: {
+                lastPosition: data.positionSec,
+                isFinished,
+                updatedAt: new Date().toISOString(),
+            },
+        })
+        .returning();
+
+    if (!result) throw new AppError('Failed to save progress', { statusCode: 500 });
+
+    return toWatchHistoryDTO(result);
 };
 
 export const resolveVideo = async (videoId: string): Promise<VideoResolved> => {

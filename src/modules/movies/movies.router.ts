@@ -73,15 +73,4 @@ router.patch(
     MoviesController.updateOne
 );
 
-router.post(
-    '/:id/watch',
-    rateLimit({
-        ...limiterConfigs.defaults(),
-        windowMs: 2 * 1000, // 30 per 2s
-        limit: 30,
-        keyGenerator: limiterConfigs.authenticatedKey,
-    }),
-    MoviesController.saveMovieWatch
-);
-
 export default router;

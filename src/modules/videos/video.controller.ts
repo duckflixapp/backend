@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { catchAsync } from '@utils/catchAsync';
-import { createVideoSchema, videoParamsSchema } from './video.validator';
+import { createProgressSchema, createVideoSchema, videoParamsSchema } from './video.validator';
 import { AppError } from '@shared/errors';
 import { identifyVideoWorkflow } from './workflows/identify.workflow';
 import * as VideoService from './video.service';
@@ -87,6 +87,25 @@ export const deleteVideo = catchAsync(async (req: Request, res: Response) => {
     await VideoService.deleteVideoById(id);
 
     res.sendStatus(204);
+});
+
+export const getVideoProgress = catchAsync(async (req: Request, res: Response) => {
+    const { id } = videoParamsSchema.parse(req.params);
+    const userId = req.user!.id;
+
+    const watchHistory = await VideoService.getVideoProgressById({ userId, videoId: id });
+
+    res.status(200).json({ status: 'success', data: { watchHistory } });
+});
+
+export const saveVideoProgress = catchAsync(async (req: Request, res: Response) => {
+    const { id } = videoParamsSchema.parse(req.params);
+    const { positionSec } = createProgressSchema.parse(req.body);
+    const userId = req.user!.id;
+
+    const watchHistory = await VideoService.saveVideoProgressById({ userId, videoId: id, positionSec });
+
+    res.status(201).json({ status: 'success', data: { watchHistory } });
 });
 
 export const resolveVideo = catchAsync(async (req: Request, res: Response) => {

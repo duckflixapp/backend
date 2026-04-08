@@ -1,5 +1,5 @@
 import type { VideoStatus, VideoType, VideoVersionStatus } from '@duckflixapp/shared';
-import { pgTable, uuid, integer, text, timestamp, boolean, bigint } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, integer, text, timestamp, boolean, bigint, uniqueIndex } from 'drizzle-orm/pg-core';
 import { relations, type InferSelectModel } from 'drizzle-orm';
 
 import { users } from './user.schema';
@@ -45,12 +45,30 @@ export const subtitles = pgTable('subtitles', {
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' }).notNull().defaultNow(),
 });
 
+export const watchHistory = pgTable(
+    'watch_history',
+    {
+        id: uuid('id').defaultRandom().primaryKey(),
+        userId: uuid('user_id')
+            .notNull()
+            .references(() => users.id, { onDelete: 'cascade' }),
+        videoId: uuid('video_id')
+            .notNull()
+            .references(() => videos.id, { onDelete: 'cascade' }),
+        lastPosition: integer('last_position').default(0).notNull(),
+        isFinished: boolean('is_finished').default(false).notNull(),
+        updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' }).notNull().defaultNow(),
+    },
+    (table) => [uniqueIndex('user_video_idx').on(table.userId, table.videoId)]
+);
+
 // ------------------------------------
 // Types
 // ------------------------------------
 export type Video = InferSelectModel<typeof videos>;
 export type VideoVersion = InferSelectModel<typeof videoVersions>;
 export type Subtitle = InferSelectModel<typeof subtitles>;
+export type WatchHistory = InferSelectModel<typeof watchHistory>;
 
 export type NewVideoVersion = typeof videoVersions.$inferInsert;
 
@@ -70,6 +88,7 @@ export const videosRelations = relations(videos, ({ one, many }) => ({
     episode: one(seriesEpisodes),
     versions: many(videoVersions),
     subtitles: many(subtitles),
+    watchHistory: many(watchHistory),
 }));
 
 export const videoVersionsRelations = relations(videoVersions, ({ one }) => ({
@@ -82,6 +101,17 @@ export const videoVersionsRelations = relations(videoVersions, ({ one }) => ({
 export const subtitlesRelations = relations(subtitles, ({ one }) => ({
     video: one(videos, {
         fields: [subtitles.videoId],
+        references: [videos.id],
+    }),
+}));
+
+export const watchHistoryRelations = relations(watchHistory, ({ one }) => ({
+    user: one(users, {
+        fields: [watchHistory.userId],
+        references: [users.id],
+    }),
+    video: one(videos, {
+        fields: [watchHistory.videoId],
         references: [videos.id],
     }),
 }));

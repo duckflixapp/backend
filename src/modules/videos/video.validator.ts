@@ -47,6 +47,10 @@ export const videoVersionParamsSchema = videoParamsSchema.extend({
     versionId: z.uuid('Invalid video version ID format'),
 });
 
+export const createProgressSchema = z.object({
+    positionSec: z.number().int().positive(),
+});
+
 export type CreateMovieInput = z.infer<typeof createMovieSchema>;
 export type CreateEpisodeInput = z.infer<typeof createEpisodeSchema>;
 export type CreateVideoInput = z.infer<typeof createVideoSchema>;

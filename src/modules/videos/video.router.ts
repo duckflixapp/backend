@@ -30,7 +30,7 @@ router.get(
     '/:id',
     rateLimit({
         ...limiterConfigs.defaults(),
-        windowMs: 2 * 1000, // 20 per 30s
+        windowMs: 2 * 1000, // 30 per 2s
         limit: 30,
         keyGenerator: limiterConfigs.authenticatedKey,
     }),
@@ -42,11 +42,33 @@ router.delete(
     hasRole('contributor'),
     rateLimit({
         ...limiterConfigs.defaults(),
-        windowMs: 2 * 1000, // 20 per 30s
+        windowMs: 2 * 1000, // 30 per 2s
         limit: 30,
         keyGenerator: limiterConfigs.authenticatedKey,
     }),
     VideoController.deleteVideo
+);
+
+router.get(
+    '/:id/progress',
+    rateLimit({
+        ...limiterConfigs.defaults(),
+        windowMs: 2 * 1000, // 30 per 2s
+        limit: 30,
+        keyGenerator: limiterConfigs.authenticatedKey,
+    }),
+    VideoController.getVideoProgress
+);
+
+router.post(
+    '/:id/progress',
+    rateLimit({
+        ...limiterConfigs.defaults(),
+        windowMs: 2 * 1000, // 30 per 2s
+        limit: 30,
+        keyGenerator: limiterConfigs.authenticatedKey,
+    }),
+    VideoController.saveVideoProgress
 );
 
 router.get(

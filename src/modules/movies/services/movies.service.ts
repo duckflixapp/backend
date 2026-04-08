@@ -192,5 +192,3 @@ export const getFeatured = async (options: { userId: string | null } = { userId:
 
     return getMovieById(featured.id, options);
 };
-
-export const recordWatchStart = async (_movieId: string, _userId: string) => {};

@@ -1,5 +1,13 @@
-import type { SubtitleDTO, SubtitleSearchResultDTO, UserRole, VideoDTO, VideoMinDTO, VideoVersionDTO } from '@duckflixapp/shared';
-import type { Subtitle, Video, VideoVersion } from '@schema/video.schema';
+import type {
+    SubtitleDTO,
+    SubtitleSearchResultDTO,
+    UserRole,
+    VideoDTO,
+    VideoMinDTO,
+    VideoVersionDTO,
+    WatchHistoryDTO,
+} from '@duckflixapp/shared';
+import type { Subtitle, Video, VideoVersion, WatchHistory } from '@schema/video.schema';
 import { toUserMinDTO } from './user.mapper';
 import { env } from '@core/env';
 import type { SubtitleData } from '@shared/types/opensubs';
@@ -65,3 +73,12 @@ export const toSubtitleSearchResultDTO = (s: SubtitleData): SubtitleSearchResult
         fps: s.attributes.fps,
     };
 };
+
+export const toWatchHistoryDTO = (w: WatchHistory): WatchHistoryDTO => ({
+    id: w.id,
+    userId: w.userId,
+    videoId: w.videoId,
+    lastPosition: w.lastPosition,
+    isFinished: w.isFinished,
+    updatedAt: w.updatedAt,
+});
