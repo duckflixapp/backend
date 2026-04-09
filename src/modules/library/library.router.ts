@@ -1,26 +1,107 @@
-import { Router } from 'express';
-import * as LibraryController from './library.controller';
-import rateLimit from 'express-rate-limit';
-import { limiterConfigs } from '@shared/limiters';
+import { Elysia } from 'elysia';
+import { authGuard } from '@shared/middlewares/auth.middleware';
+import * as LibraryService from './library.service';
+import {
+    getUserLibrariesScheme,
+    libraryScheme,
+    newLibraryScheme,
+    libraryQuerySchema,
+    libraryItemScheme,
+    libraryItemTypeScheme,
+} from './library.validator';
+import { createRateLimit } from '@shared/configs/ratelimit';
 
-const router = Router();
+const libraryLimiter = createRateLimit({
+    max: 45,
+    duration: 3000,
+});
 
-const defaultLimiter = () =>
-    rateLimit({
-        ...limiterConfigs.defaults(),
-        windowMs: 3 * 1000, // 45 per 3s
-        limit: 45,
-        keyGenerator: limiterConfigs.authenticatedKey,
-    });
+export const libraryRouter = new Elysia({ prefix: '/libraries' })
+    .use(authGuard)
+    .use(libraryLimiter)
+    .guard({ auth: true })
+    .get(
+        '/',
+        async ({ user, query }) => {
+            const libraries = await LibraryService.getUserLibraries(user.id, query);
 
-router.get('/', defaultLimiter(), LibraryController.getUserLibraries);
+            return { status: 'success', data: { libraries } };
+        },
+        {
+            query: getUserLibrariesScheme,
+            detail: { tags: ['Library'] },
+        }
+    )
+    .post(
+        '/',
+        async ({ user, body }) => {
+            const library = await LibraryService.createUserLibrary(user.id, body);
 
-router.post('/', defaultLimiter(), LibraryController.createLibrary);
-router.get('/:id', defaultLimiter(), LibraryController.getLibrary);
-router.delete('/:id', defaultLimiter(), LibraryController.removeLibrary);
+            return { status: 'success', data: { library } };
+        },
+        {
+            body: newLibraryScheme,
+            detail: { tags: ['Library'] },
+        }
+    )
+    .get(
+        '/:libraryId',
+        async ({ user, params: { libraryId } }) => {
+            const library = await LibraryService.getUserLibrary(user.id, libraryId);
+            return { status: 'success', data: { library } };
+        },
+        {
+            params: libraryScheme,
+            detail: { tags: ['Library'] },
+        }
+    )
+    .delete(
+        '/:libraryId',
+        async ({ user, params: { libraryId }, set }) => {
+            await LibraryService.deleteUserLibrary(user.id, libraryId);
+            set.status = 204;
+        },
+        {
+            params: libraryScheme,
+            detail: { tags: ['Library'] },
+        }
+    )
+    .get(
+        '/:libraryId/items',
+        async ({ user, params: { libraryId }, query }) => {
+            const paginatedResults = await LibraryService.getUserLibraryItems(user.id, libraryId, query);
 
-router.get('/:id/items/', defaultLimiter(), LibraryController.getLibraryItems);
-router.post('/:libraryId/items/:contentId', defaultLimiter(), LibraryController.addContent);
-router.delete('/:libraryId/items/:contentId', defaultLimiter(), LibraryController.removeContent);
+            return { status: 'success', ...paginatedResults };
+        },
+        {
+            params: libraryScheme,
+            query: libraryQuerySchema,
+            detail: { tags: ['Library'] },
+        }
+    )
+    .post(
+        '/:libraryId/items/:contentId',
+        async ({ user, params: { libraryId, contentId }, query, set }) => {
+            await LibraryService.addContentToUserLibrary(user.id, libraryId, contentId, query.type);
 
-export default router;
+            set.status = 204;
+        },
+        {
+            params: libraryItemScheme,
+            query: libraryItemTypeScheme,
+            detail: { tags: ['Library'] },
+        }
+    )
+    .delete(
+        '/:libraryId/items/:contentId',
+        async ({ user, params: { libraryId, contentId }, query, set }) => {
+            await LibraryService.removeContentFromUserLibrary(user.id, libraryId, contentId, query.type);
+
+            set.status = 204;
+        },
+        {
+            params: libraryItemScheme,
+            query: libraryItemTypeScheme,
+            detail: { tags: ['Library'] },
+        }
+    );

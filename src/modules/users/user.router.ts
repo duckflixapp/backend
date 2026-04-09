@@ -1,56 +1,56 @@
-import { Router } from 'express';
-import * as UsersController from './user.controller';
-import rateLimit from 'express-rate-limit';
-import { limiterConfigs } from '@shared/limiters';
-import { authenticate } from '@shared/middlewares/auth.middleware';
+import { Elysia } from 'elysia';
+import { authGuard } from '@shared/middlewares/auth.middleware';
+import * as UserService from './user.service';
+import { validateMarkUserNotifications } from './user.validator';
+import { createRateLimit } from '@shared/configs/ratelimit';
 
-const router = Router();
-
-router.get(
-    '/@me',
-    authenticate(false),
-    rateLimit({
-        ...limiterConfigs.defaults(),
-        windowMs: 3 * 1000, // 45 per 3s
-        limit: 45,
-        keyGenerator: limiterConfigs.authenticatedKey,
-    }),
-    UsersController.getMe
-);
-
-router.use(authenticate());
-
-router.get(
-    '/@me/notifications',
-    rateLimit({
-        ...limiterConfigs.defaults(),
-        windowMs: 3 * 1000, // 45 per 3s
-        limit: 45,
-        keyGenerator: limiterConfigs.authenticatedKey,
-    }),
-    UsersController.getUserNotifications
-);
-
-router.patch(
-    '/@me/notifications/mark',
-    rateLimit({
-        ...limiterConfigs.defaults(),
-        windowMs: 3 * 1000, // 45 per 3s
-        limit: 45,
-        keyGenerator: limiterConfigs.authenticatedKey,
-    }),
-    UsersController.markUserNotifications
-);
-
-router.delete(
-    '/@me/notifications',
-    rateLimit({
-        ...limiterConfigs.defaults(),
-        windowMs: 3 * 1000, // 15 per 3s
-        limit: 15,
-        keyGenerator: limiterConfigs.authenticatedKey,
-    }),
-    UsersController.clearUserNotifications
-);
-
-export default router;
+export const usersRouter = new Elysia({ prefix: '/users' })
+    .use(authGuard)
+    .guard({ auth: true })
+    .use(createRateLimit({ max: 30, duration: 3000 }))
+    .get(
+        '/@me',
+        async ({ user }) => {
+            const data = await UserService.getMe(user.id);
+            return { status: 'success', data: { user: data } };
+        },
+        {
+            detail: { tags: ['Users'] },
+            auth: { verified: false },
+        }
+    )
+    .get(
+        '/@me/notifications',
+        async ({ user }) => {
+            const notifications = await UserService.getUserNotifications(user.id);
+            return { status: 'success', data: { notifications } };
+        },
+        {
+            detail: { tags: ['Users'] },
+        }
+    )
+    .patch(
+        '/@me/notifications/mark',
+        async ({ body, user }) => {
+            const { notificationIds } = validateMarkUserNotifications.parse(body);
+            await UserService.markUserNotifications(user.id, {
+                markAll: notificationIds.length === 0,
+                notificationIds,
+            });
+            return { status: 'success' };
+        },
+        {
+            body: validateMarkUserNotifications,
+            detail: { tags: ['Users'] },
+        }
+    )
+    .delete(
+        '/@me/notifications',
+        async ({ user, set }) => {
+            await UserService.clearUserNotifications(user.id);
+            set.status = 204;
+        },
+        {
+            detail: { tags: ['Users'] },
+        }
+    );

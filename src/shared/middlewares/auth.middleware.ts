@@ -1,63 +1,93 @@
-import type { Request, Response, NextFunction } from 'express';
+import { Elysia } from 'elysia';
 import type { ExtendedError, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import cookie from 'cookie';
-import { catchAsync } from '@utils/catchAsync';
+import { z } from 'zod';
+
 import { AppError } from '@shared/errors';
-import { csrfGuard } from './csrf.middleware';
 import { verifyToken } from '@utils/jwt';
 import { roleHierarchy, type UserRole } from '@duckflixapp/shared';
+import { csrfPlugin } from './csrf.middleware';
+import { logger } from '@shared/configs/logger';
 
+// ----- Schema -----
+export const AuthUserSchema = z.object({
+    id: z.string(),
+    role: z.string().describe('Uloga korisnika u sistemu'),
+    isVerified: z.boolean().describe('Da li je korisnik verifikovao email'),
+});
+
+export type AuthUser = z.infer<typeof AuthUserSchema>;
+
+// ----- Error -----
 export class UnauthorizedError extends AppError {
-    constructor(message: string = 'Unauthorized access') {
+    constructor(message = 'Unauthorized access') {
         super(message, { statusCode: 401 });
     }
 }
 
 export class ForbiddenError extends AppError {
-    constructor(message: string = 'Forbidden') {
+    constructor(message = 'Forbidden') {
         super(message, { statusCode: 403 });
     }
 }
 
-export const hasRole = (role: UserRole) => {
-    return catchAsync(async (req: Request, res: Response, next: NextFunction) => {
-        if (!req.user) throw new UnauthorizedError();
+// ----- Auth Plugin -----
+export const authPlugin = new Elysia({ name: 'auth-plugin' })
+    .use(csrfPlugin)
+    .derive({ as: 'global' }, ({ cookie: { auth_token }, headers }) => ({
+        resolveUser: (needsVerification = true): AuthUser => {
+            const authHeader = headers.authorization;
+            const token = auth_token?.value ?? (authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined);
 
-        if (roleHierarchy[req.user.role] > roleHierarchy[role]) throw new ForbiddenError();
+            if (!token) throw new UnauthorizedError('No token provided');
 
-        next();
-    });
-};
+            try {
+                const decoded = verifyToken(token as string);
+                const user: AuthUser = {
+                    id: decoded.sub,
+                    role: decoded.role as UserRole,
+                    isVerified: decoded.isVerified,
+                };
 
-export const authenticate = (verified: boolean = true) => {
-    return catchAsync(async (req: Request, res: Response, next: NextFunction) => {
-        const authHeader = req.headers.authorization;
-        const token = req.cookies.auth_token ?? (authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined);
+                if (needsVerification && !user.isVerified) {
+                    throw new ForbiddenError('Email not verified');
+                }
 
-        if (!token) throw new UnauthorizedError('No token provided');
+                return user;
+            } catch (err) {
+                if (err instanceof jwt.TokenExpiredError) throw new UnauthorizedError('Expired token');
+                throw new UnauthorizedError('Invalid token');
+            }
+        },
+    }));
 
-        let decoded;
-        try {
-            decoded = verifyToken(token);
-        } catch (err: unknown) {
-            if (err instanceof jwt.TokenExpiredError) throw new UnauthorizedError('Expired token');
-            throw new UnauthorizedError('Invalid token');
-        }
+// ----- Auth Macros -----
+export const authGuard = new Elysia({ name: 'auth-guard' }).use(authPlugin).macro({
+    auth: (options: UserRole | boolean | { role?: UserRole; verified?: boolean }) => ({
+        resolve: ({ resolveUser }) => {
+            const role = typeof options === 'string' ? options : typeof options === 'object' ? (options.role ?? true) : true;
+            const needsVerification = typeof options === 'object' && options.verified !== undefined ? options.verified : true;
 
-        if (verified && !decoded.isVerified) throw new ForbiddenError('Email not verified');
+            if (!role) return;
+            const user = resolveUser(needsVerification);
 
-        req.user = {
-            id: decoded.sub,
-            role: decoded.role,
-            isVerified: decoded.isVerified,
-        };
+            if (typeof role === 'string') {
+                const currentUserRank = roleHierarchy[user.role as keyof typeof roleHierarchy];
+                const requiredRank = roleHierarchy[role as keyof typeof roleHierarchy];
 
-        csrfGuard(req, res, next); // automatically use csrf guard
-    });
-};
+                if (currentUserRank > requiredRank) {
+                    throw new ForbiddenError('Insufficient permissions');
+                }
+            }
 
-export const authenticateSocket = async (socket: Socket, next: (err?: ExtendedError | undefined) => unknown) => {
+            return { user };
+        },
+    }),
+});
+
+// ----- Socket Authentication -----
+export const authenticateSocket = async (socket: Socket, next: (err?: ExtendedError) => unknown) => {
     try {
         const rawCookies = socket.handshake.headers.cookie;
         if (!rawCookies) return next(new UnauthorizedError('Auth error: No cookies'));

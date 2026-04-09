@@ -1,26 +1,23 @@
-import http from 'node:http';
 import { app } from '@core/app';
 import { pool } from '@shared/configs/db';
-import { SocketServer } from '@shared/lib/socket';
 import { env } from '@core/env';
 import { initalize } from '@core/initialize';
 import { logger } from '@shared/configs/logger';
 import { liveSessionManager } from '@modules/media/live.service';
-
-const PORT = env.PORT;
-
-const httpServer = http.createServer(app);
-const socketServer = new SocketServer(httpServer);
+import { SocketServer } from '@shared/lib/socket';
 
 await initalize();
 
-export const io = socketServer.init();
-const server = httpServer.listen(PORT, () => {
+const PORT = env.PORT;
+app.listen(PORT, () => {
     logger.info(`Server is running on http://localhost:${PORT}`);
 });
 
+const socketServer = new SocketServer();
+export const io = socketServer.init();
+
 process.on('SIGINT', async () => {
-    server.close();
+    app.stop();
     await pool.end();
     liveSessionManager.destroyAll();
     process.exit(0);

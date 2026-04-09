@@ -1,12 +1,11 @@
 import { Server, Socket } from 'socket.io';
-import http from 'node:http';
 import { authenticateSocket } from '../middlewares/auth.middleware';
 import { env } from '@core/env';
 
 export class SocketServer {
     private _io: Server;
-    constructor(httpServer: http.Server) {
-        this._io = new Server(httpServer, {
+    constructor(server?: Bun.Server<unknown>) {
+        this._io = new Server({
             cors: {
                 origin: env.ORIGIN,
                 credentials: true,

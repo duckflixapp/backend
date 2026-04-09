@@ -1,74 +1,65 @@
-import { Router } from 'express';
-import * as AdminController from './admin.controller';
-import rateLimit from 'express-rate-limit';
-import { limiterConfigs } from '@shared/limiters';
+import { Elysia } from 'elysia';
+import { authGuard } from '@shared/middlewares/auth.middleware';
+import { systemSettings } from '@shared/services/system.service';
+import { toSystemDTO } from '@shared/mappers/system.mapper';
+import { changeUserRoleSchema, systemSettingsUpdateSchema, userSchema } from './admin.validator';
+import * as AdminService from './admin.service';
+import { createRateLimit } from '@shared/configs/ratelimit';
 
-const router = Router();
+export const adminRouter = new Elysia({ prefix: '/admin' })
+    .use(authGuard)
+    .guard({ auth: 'admin' })
+    .use(createRateLimit({ max: 50, duration: 3000 }))
+    .get(
+        '/system',
+        async () => {
+            const system = await systemSettings.get();
+            return { status: 'success', data: { system: toSystemDTO(system) } };
+        },
+        { detail: { tags: ['Admin'] } }
+    )
+    .patch(
+        '/system',
+        async ({ body }) => {
+            if (body?.external?.tmdb?.apiKey?.includes('**********')) delete body.external.tmdb.apiKey;
+            if (body?.external?.openSubtitles?.apiKey?.includes('**********')) delete body.external.openSubtitles.apiKey;
+            if (body?.external?.openSubtitles?.password?.includes('**********')) delete body.external.openSubtitles.password;
+            if (body?.external?.email?.smtpSettings?.password?.includes('**********')) delete body.external.email.smtpSettings.password;
 
-router.get(
-    '/system',
-    rateLimit({
-        ...limiterConfigs.defaults(),
-        windowMs: 2 * 1000, // 10 per 2s
-        limit: 10,
-        keyGenerator: limiterConfigs.authenticatedKey,
-    }),
-    AdminController.getSystem
-);
-
-router.patch(
-    '/system',
-    rateLimit({
-        ...limiterConfigs.defaults(),
-        windowMs: 2 * 1000, // 10 per 2s
-        limit: 10,
-        keyGenerator: limiterConfigs.authenticatedKey,
-    }),
-    AdminController.updateSystem
-);
-
-router.get(
-    '/users',
-    rateLimit({
-        ...limiterConfigs.defaults(),
-        windowMs: 2 * 1000, // 10 per 2s
-        limit: 10,
-        keyGenerator: limiterConfigs.authenticatedKey,
-    }),
-    AdminController.getUsersWithRole
-);
-
-router.patch(
-    '/users',
-    rateLimit({
-        ...limiterConfigs.defaults(),
-        windowMs: 2 * 1000, // 10 per 2s
-        limit: 10,
-        keyGenerator: limiterConfigs.authenticatedKey,
-    }),
-    AdminController.changeUserRole
-);
-
-router.delete(
-    '/users',
-    rateLimit({
-        ...limiterConfigs.defaults(),
-        windowMs: 2 * 1000, // 10 per 2s
-        limit: 10,
-        keyGenerator: limiterConfigs.authenticatedKey,
-    }),
-    AdminController.deleteUser
-);
-
-router.get(
-    '/stats',
-    rateLimit({
-        ...limiterConfigs.defaults(),
-        windowMs: 2 * 1000, // 10 per 2s
-        limit: 10,
-        keyGenerator: limiterConfigs.authenticatedKey,
-    }),
-    AdminController.getSystemStatistics
-);
-
-export default router;
+            const system = await systemSettings.update(body);
+            return { status: 'success', data: { system: toSystemDTO(system) } };
+        },
+        { body: systemSettingsUpdateSchema, detail: { tags: ['Admin'] } }
+    )
+    .get(
+        '/users',
+        async () => {
+            const users = await AdminService.getUsersWithRoles();
+            return { status: 'success', data: { users } };
+        },
+        { detail: { tags: ['Admin'] } }
+    )
+    .patch(
+        '/users',
+        async ({ body, user }) => {
+            await AdminService.changeUserRole(body.email, body.role, { userId: user.id });
+            return new Response(null, { status: 204 });
+        },
+        { body: changeUserRoleSchema, detail: { tags: ['Admin'] } }
+    )
+    .delete(
+        '/users',
+        async ({ body, user }) => {
+            await AdminService.deleteUser(body.email, { userId: user.id });
+            return new Response(null, { status: 204 });
+        },
+        { body: userSchema, detail: { tags: ['Admin'] } }
+    )
+    .get(
+        '/stats',
+        async () => {
+            const statistics = await AdminService.getSystemStatistics();
+            return { status: 'success', data: { statistics } };
+        },
+        { detail: { tags: ['Admin'] } }
+    );

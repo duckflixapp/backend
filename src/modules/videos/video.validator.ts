@@ -48,7 +48,7 @@ export const videoVersionParamsSchema = videoParamsSchema.extend({
 });
 
 export const createProgressSchema = z.object({
-    positionSec: z.number().int().positive(),
+    positionSec: z.number().int().nonnegative(),
 });
 
 export type CreateMovieInput = z.infer<typeof createMovieSchema>;
