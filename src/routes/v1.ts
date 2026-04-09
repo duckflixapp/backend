@@ -1,17 +1,15 @@
 import { Elysia } from 'elysia';
-// import { authPlugin, rolePlugin } from '@shared/middlewares/auth.middleware';
 import { authRouter } from '@modules/auth';
 import { usersRouter } from '@modules/users';
 import { adminRouter } from '@modules/admin';
 import { libraryRouter } from '@modules/library';
 import { searchRouter } from '@modules/search';
-import { videoRouter } from '../modules/videos';
-// import movieRouter from '../modules/movies/movies.router';
-// import seriesRouter from '../modules/series/router';
-// import mediaRouter from '../modules/media/media.router';
-// import adminRouter from '../modules/admin/admin.router';
-// import tasksRouter from '../modules/tasks/tasks.router';
+import { videoRouter } from '@modules/videos';
+import { moviesRouter } from '@modules/movies';
+import { seriesRouter } from '@modules/series';
 import { healthRouter } from './health';
+import { tasksRouter } from '@modules/tasks';
+import { mediaRouter } from '@modules/media';
 
 export const v1 = new Elysia({ prefix: '/v1' })
     .use(healthRouter)
@@ -20,8 +18,8 @@ export const v1 = new Elysia({ prefix: '/v1' })
     .use(adminRouter)
     .use(libraryRouter)
     .use(searchRouter)
-    .use(videoRouter);
-// .use(new Elysia().use(authPlugin()).use(movieRouter))
-// .use(new Elysia().use(authPlugin()).use(seriesRouter))
-// .use(mediaRouter)
-// .use(new Elysia().use(rolePlugin('contributor')).use(tasksRouter));
+    .use(videoRouter)
+    .use(moviesRouter)
+    .use(seriesRouter)
+    .use(tasksRouter)
+    .use(mediaRouter);

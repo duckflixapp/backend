@@ -4,7 +4,7 @@ import { env } from '@core/env';
 
 export class SocketServer {
     private _io: Server;
-    constructor(server?: Bun.Server<unknown>) {
+    constructor(_server?: Bun.Server<unknown>) {
         this._io = new Server({
             cors: {
                 origin: env.ORIGIN,

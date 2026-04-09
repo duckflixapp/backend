@@ -12,6 +12,7 @@ const searchLimiter = createRateLimit({
 export const searchRouter = new Elysia({ prefix: '/search' })
     .use(authGuard)
     .use(searchLimiter)
+    .guard({ auth: true })
     .get(
         '/',
         async ({ query }) => {

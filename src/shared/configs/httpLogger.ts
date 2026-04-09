@@ -1,6 +1,5 @@
 import Elysia from 'elysia';
 import { logger } from './logger';
-import pino from 'pino';
 
 const colors = {
     reset: '\x1b[0m',

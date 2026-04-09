@@ -14,6 +14,7 @@ import path from 'node:path';
 import * as VersionService from './services/versions.service';
 import * as SubtitlesService from './services/subtitles.service';
 import { importBodySchema, searchQuerySchema, subtitleParamsSchema, uploadBodySchema } from './subtitles.validator';
+import { limits } from '@shared/configs/limits.config';
 
 const uploadLimiter = createRateLimit({ max: 20, duration: 30000 });
 const standardLimiter = createRateLimit({ max: 30, duration: 3000 });
@@ -72,6 +73,30 @@ export const videoRouter = new Elysia({ prefix: '/videos', detail: { tags: ['Vid
 
                     if (!videoFile && !torrentFile)
                         throw new AppError('Please provide either a valid video or torrent file', { statusCode: 400 });
+
+                    if (videoFile) {
+                        if (videoFile.size > limits.file.upload * 1024 * 1024) {
+                            throw new AppError('Video file exceeds maximum allowed size.', { statusCode: 400 });
+                        }
+
+                        const isValidMime = videoFile.type.startsWith('video/') || videoFile.type === 'application/octet-stream';
+                        if (!isValidMime) {
+                            throw new AppError('Only video files (mp4, mkv, avi, mov) are allowed', { statusCode: 400 });
+                        }
+                    }
+
+                    if (torrentFile) {
+                        if (torrentFile.size > 5 * 1024 * 1024) {
+                            throw new AppError('Torrent file is suspiciously large', { statusCode: 400 });
+                        }
+
+                        const isTorrentMime = torrentFile.type === 'application/x-bittorrent';
+                        const isTorrentExt = torrentFile.name.toLowerCase().endsWith('.torrent');
+
+                        if (!isTorrentMime && !isTorrentExt) {
+                            throw new AppError('The "torrent" field must contain a .torrent file.', { statusCode: 400 });
+                        }
+                    }
 
                     let savedVideoPath: string | undefined;
                     let savedTorrentPath: string | undefined;
@@ -201,6 +226,20 @@ export const videoRouter = new Elysia({ prefix: '/videos', detail: { tags: ['Vid
                         '/',
                         async ({ params: { id: videoId }, body: { language, subtitle: subtitleFile }, set }) => {
                             if (!subtitleFile) throw new AppError('Please provide a valid subtitle file', { statusCode: 400 });
+
+                            if (subtitleFile.size > 5 * 1024 * 1024) {
+                                // 5MB limit
+                                throw new AppError('Subtitle file exceeds maximum size of 5MB', { statusCode: 400 });
+                            }
+
+                            const allowedExtensions = ['.srt', '.vtt', '.ass', '.ssa', '.sub'];
+                            const ext = subtitleFile.name.toLowerCase().slice(subtitleFile.name.lastIndexOf('.'));
+
+                            if (!allowedExtensions.includes(ext)) {
+                                throw new AppError(`Unsupported subtitle format. Allowed: ${allowedExtensions.join(', ')}`, {
+                                    statusCode: 400,
+                                });
+                            }
 
                             const tempPath = path.join(process.cwd(), 'uploads/temp', `${Date.now()}-${subtitleFile.name}`);
                             await Bun.write(tempPath, subtitleFile);
