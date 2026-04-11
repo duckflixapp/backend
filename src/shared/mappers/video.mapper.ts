@@ -54,7 +54,7 @@ export const toSubtitleDTO = (s: Subtitle): SubtitleDTO => ({
     name: s.name ?? null,
     language: s.language,
     externalId: s.externalId,
-    subtitleUrl: `${BASE_URL}/media/subtitle/${s.id}`,
+    subtitleUrl: `${BASE_URL}/media/subtitles/${s.id}`,
     createdAt: s.createdAt,
 });
 
