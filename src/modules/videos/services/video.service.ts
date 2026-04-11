@@ -265,6 +265,16 @@ export const saveVideoProgressById = async (data: { videoId: string; userId: str
     // in future implement ffmpeg logic to find intro and outro
     const isFinished = video.duration ? data.positionSec > video.duration * 0.95 : false;
 
+    const [existingProgress] = await db
+        .select()
+        .from(watchHistory)
+        .where(and(eq(watchHistory.userId, data.userId), eq(watchHistory.videoId, data.videoId)));
+
+    // if video already started watching dont allow sending progress from 0 where user video started again automatically
+    if (!!existingProgress && data.positionSec < 20 && data.positionSec <= existingProgress.lastPosition) {
+        return toWatchHistoryDTO(existingProgress);
+    }
+
     const [result] = await db
         .insert(watchHistory)
         .values({

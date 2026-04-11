@@ -1,19 +1,20 @@
 PRIORITY: 
 
 - Series metadata settings
-- Subtitles settings
+- Better upload form. Wizzard-like
+- Play button on featured
+- Movie, episode cast
+- Subtitle opacity, delay
 
 SYSTEM
 
 - Login ratelimit/account block
 - Upload for multiple video files in torrent?
-- Better upload form. Wizzard-like
 - Notification pagination
 - Pasting magnets
-- Play button on featured
-- Movie, episode cast
 - While processing video find intro, outro
 - Cache banner & poster
+- Cancel Torrent download
 
 DETAILS
 
@@ -28,7 +29,6 @@ WATCH
 
 - Seeking on keyboard(canceled reqs)?
 - Cast -> local subtitles, sync media controlls
-- Subtitle opacity, delay
 
 User
 
