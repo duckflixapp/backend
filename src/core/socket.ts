@@ -11,7 +11,6 @@ export const socketPlugin = new Elysia().use(socketAuthPlugin).ws('/ws', {
         }
 
         ws.subscribe(`user:${userId}`);
-        console.log(`User ${userId} connected`);
     },
     message(ws, { event, data }) {
         switch (event) {
@@ -23,10 +22,6 @@ export const socketPlugin = new Elysia().use(socketAuthPlugin).ws('/ws', {
                 if (data) ws.unsubscribe(`video:${data}`);
                 break;
         }
-    },
-    close(ws) {
-        const userId = ws.data.user?.id;
-        console.log(`User ${userId} disconnected`);
     },
     body: t.Object({
         event: t.Union([t.Literal('video:join'), t.Literal('video:leave')]),
