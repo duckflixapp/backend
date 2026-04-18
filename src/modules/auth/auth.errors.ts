@@ -17,3 +17,15 @@ export class InvalidCredentialsError extends AppError {
         super('Invalid email or password', { statusCode: 401 });
     }
 }
+
+export class TooManyAuthAttemptsError extends AppError {
+    constructor() {
+        super('Too many authentication attempts. Try again later.', { statusCode: 429 });
+    }
+}
+
+export class AuthTemporarilyLockedError extends AppError {
+    constructor() {
+        super('Too many authentication attempts. Try again later.', { statusCode: 429 });
+    }
+}
