@@ -5,6 +5,15 @@ on:
         branches: [main]
     pull_request:
         branches: [main]
+    workflow_dispatch:
+
+permissions:
+    contents: read
+    packages: read
+
+concurrency:
+    group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+    cancel-in-progress: true
 
 jobs:
     check:
@@ -16,7 +25,11 @@ jobs:
               run: bun install --frozen-lockfile
               env:
                   NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            - name: Format check
+              run: bun run format:check
             - name: Type check
               run: bun run typecheck
             - name: Lint
               run: bun run lint
+            - name: Run tests
+              run: bun test
