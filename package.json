@@ -11,6 +11,7 @@
         "db:migrate": "drizzle-kit migrate --config drizzle.config.ts",
         "db:generate": "drizzle-kit generate",
         "db:studio": "drizzle-kit studio",
+        "format:check": "prettier --check .",
         "lint": "eslint ./src --ext .ts",
         "format": "prettier --write .",
         "typecheck": "tsc --noEmit"
