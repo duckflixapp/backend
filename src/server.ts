@@ -7,12 +7,14 @@ import { liveSessionManager } from '@modules/media/live.service';
 import { socketPlugin } from '@core/socket';
 import { Socket } from '@shared/lib/socket';
 
+const PORT = env.PORT;
+const HOSTNAME = env.HOSTNAME;
+
 await initalize();
 
 app.use(socketPlugin);
 
-const PORT = env.PORT;
-app.listen(PORT, () => {
+app.listen({ port: PORT, hostname: HOSTNAME }, () => {
     logger.info(`Server is running on http://localhost:${PORT}`);
 });
 

@@ -2,6 +2,7 @@ import z from 'zod';
 const envSchema = z.object({
     // Server
     VERSION: z.string().default(process.env.npm_package_version ?? '0.0.0'),
+    HOSTNAME: z.string().default('localhost'),
     PORT: z.coerce.number().default(3000),
     BASE_URL: z.url(),
     PROXIES: z.coerce.number().default(0),
