@@ -18,9 +18,8 @@ const calls = {
     destroyCalls: [] as number[],
     addListenerCalls: [] as Array<{ event: string; torrentId: number }>,
     ffprobe: [] as string[],
-    extractSubtitlesWorkflow: [] as unknown[],
-    downloadSubtitlesWorkflow: [] as unknown[],
     computeHash: [] as string[],
+    getSubtitles: [] as unknown[],
     startProcessing: [] as unknown[],
     loggerErrors: [] as unknown[],
     transactionInsert: [] as unknown[],
@@ -70,11 +69,18 @@ let ffprobeImpl = async (_path: string): Promise<FFprobeData> => ({
     ],
 });
 let getStorageStatisticsImpl = async () => ({ availableBytes: 10_000_000 });
-let extractSubtitlesWorkflowImpl = async (_data: unknown) => {};
-let downloadSubtitlesWorkflowImpl = async (..._args: unknown[]) => {};
 let computeHashImpl = async (_path: string) => 'mocked-hash';
-let systemSettingsGetImpl = async () => ({ features: { autoTranscoding: 'compatibility' } });
+let systemSettingsGetImpl = async () => ({
+    features: { autoTranscoding: 'compatibility' },
+    preferences: {
+        subtitles: [
+            { lang: 'en', variants: 1 },
+            { lang: 'sr', variants: 1 },
+        ],
+    },
+});
 let startProcessingImpl = async (..._args: unknown[]) => {};
+let getSubtitlesImpl = async (_opts: unknown) => [] as Array<{ id: string; language: string; files: Array<{ file_id: number }> }>;
 
 const createTorrent = (overrides: Partial<MockTorrent> = {}): MockTorrent => {
     const listeners = new Map<string, (...args: unknown[]) => void>();
@@ -233,21 +239,17 @@ mock.module('@shared/services/video', () => ({
 
 mock.module('@utils/ffmpeg', () => ({
     getMimeTypeFromFormat: (formatName: string) => (formatName.includes('mp4') ? 'video/mp4' : 'video/x-matroska'),
+    extractSubtitleStream: async (_opts: unknown) => {},
+    convertSRTtoVTT: async (_stream: ReadableStream | null, _outputPath: string) => {},
 }));
 
 mock.module('@shared/services/storage.service', () => ({
     getStorageStatistics: async () => await getStorageStatisticsImpl(),
 }));
 
-mock.module('./subtitles.workflow', () => ({
-    extractSubtitlesWorkflow: async (data: unknown) => {
-        calls.extractSubtitlesWorkflow.push(data);
-        return await extractSubtitlesWorkflowImpl(data);
-    },
-    downloadSubtitlesWorkflow: (...args: unknown[]) => {
-        calls.downloadSubtitlesWorkflow.push(args);
-        return downloadSubtitlesWorkflowImpl(...args);
-    },
+mock.module('@utils/subs', () => ({
+    normalizeLanguage: () => null,
+    createSubtitleName: (lang: string) => lang,
 }));
 
 mock.module('../subtitles.utils', () => ({
@@ -255,11 +257,22 @@ mock.module('../subtitles.utils', () => ({
         calls.computeHash.push(filePath);
         return await computeHashImpl(filePath);
     },
+    mapSubtitles: (subtitlesRaw: unknown) => subtitlesRaw,
 }));
 
 mock.module('@shared/services/system.service', () => ({
     systemSettings: {
         get: async () => await systemSettingsGetImpl(),
+    },
+}));
+
+mock.module('@shared/lib/opensubs', () => ({
+    subtitlesClient: {
+        getSubtitles: async (opts: unknown) => {
+            calls.getSubtitles.push(opts);
+            return await getSubtitlesImpl(opts);
+        },
+        downloadSubtitle: async () => ({ link: 'https://example.com/sub.srt' }),
     },
 }));
 
@@ -309,11 +322,18 @@ describe('processTorrentFileWorkflow', () => {
             ],
         });
         getStorageStatisticsImpl = async () => ({ availableBytes: 10_000_000 });
-        extractSubtitlesWorkflowImpl = async () => {};
-        downloadSubtitlesWorkflowImpl = async () => {};
         computeHashImpl = async () => 'mocked-hash';
-        systemSettingsGetImpl = async () => ({ features: { autoTranscoding: 'compatibility' } });
+        systemSettingsGetImpl = async () => ({
+            features: { autoTranscoding: 'compatibility' },
+            preferences: {
+                subtitles: [
+                    { lang: 'en', variants: 1 },
+                    { lang: 'sr', variants: 1 },
+                ],
+            },
+        });
         startProcessingImpl = async () => {};
+        getSubtitlesImpl = async (_opts) => [];
     });
 
     test('rejects oversized torrent and still removes uploaded torrent file', async () => {
@@ -395,9 +415,8 @@ describe('processTorrentFileWorkflow', () => {
         expect(calls.rm).toContainEqual({ path: '/downloads/torrent-dir', options: { recursive: true, force: true } });
         expect(calls.destroyCalls).toContain(99);
         expect(calls.ffprobe).toContain('/downloads/video-1-torrent.mkv');
-        expect(calls.extractSubtitlesWorkflow).toHaveLength(1);
         expect(calls.computeHash.some((filePath) => filePath.startsWith('/storage/videos/video-1/'))).toBe(true);
-        expect(calls.downloadSubtitlesWorkflow).toHaveLength(1);
+        expect(calls.getSubtitles).toHaveLength(1);
     });
 
     test('emits progress updates from torrent listener', async () => {

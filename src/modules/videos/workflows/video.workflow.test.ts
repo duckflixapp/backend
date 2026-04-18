@@ -22,11 +22,10 @@ const calls = {
     rename: [] as Array<{ from: string; to: string }>,
     copyFile: [] as Array<{ from: string; to: string }>,
     rm: [] as Array<{ path: string; options?: object }>,
-    extractSubtitlesWorkflow: [] as unknown[],
-    downloadSubtitlesWorkflow: [] as unknown[],
     notifyJobStatus: [] as unknown[],
     startProcessing: [] as unknown[],
     computeHash: [] as string[],
+    getSubtitles: [] as unknown[],
     loggerErrors: [] as unknown[],
     transactionInsert: [] as unknown[],
     transactionUpdate: [] as unknown[],
@@ -55,13 +54,20 @@ let copyFileImpl = async (_from: string, _to: string) => {};
 let unlinkImpl = async (_path: string) => {};
 let mkdirImpl = async (_path: string, _options?: object) => {};
 let rmImpl = async (_path: string, _options?: object) => {};
-let extractSubtitlesWorkflowImpl = async (_data: unknown) => {};
-let downloadSubtitlesWorkflowImpl = async (..._args: unknown[]) => {};
 let notifyJobStatusImpl = async (..._args: unknown[]) => {};
 let computeHashImpl = async (_path: string) => 'mocked-hash';
-let systemSettingsGetImpl = async () => ({ features: { autoTranscoding: 'smart' } });
+let systemSettingsGetImpl = async () => ({
+    features: { autoTranscoding: 'smart' },
+    preferences: {
+        subtitles: [
+            { lang: 'en', variants: 1 },
+            { lang: 'sr', variants: 1 },
+        ],
+    },
+});
 let startProcessingImpl = async (..._args: unknown[]) => {};
 let loggerErrorImpl = (..._args: unknown[]) => {};
+let getSubtitlesImpl = async (_opts: unknown) => [] as Array<{ id: string; language: string; files: Array<{ file_id: number }> }>;
 let transactionImpl = async (
     callback: (tx: {
         insert: (table: unknown) => { values: (values: unknown) => Promise<void> };
@@ -123,6 +129,8 @@ mock.module('@shared/configs/db', () => ({
 
 mock.module('@utils/ffmpeg', () => ({
     getMimeTypeFromFormat: (formatName: string) => (formatName.includes('mp4') ? 'video/mp4' : 'video/x-matroska'),
+    extractSubtitleStream: async (_opts: unknown) => {},
+    convertSRTtoVTT: async (_stream: ReadableStream | null, _outputPath: string) => {},
 }));
 
 mock.module('../video.processor', () => ({
@@ -151,6 +159,7 @@ mock.module('../subtitles.utils', () => ({
         calls.computeHash.push(filePath);
         return computeHashImpl(filePath);
     },
+    mapSubtitles: (subtitlesRaw: unknown) => subtitlesRaw,
 }));
 
 mock.module('@shared/services/system.service', () => ({
@@ -162,17 +171,24 @@ mock.module('@shared/services/system.service', () => ({
 mock.module('@shared/configs/logger', () => ({
     logger: {
         error: (...args: unknown[]) => loggerErrorImpl(...args),
+        debug: () => {},
+        info: () => {},
+        warn: () => {},
     },
 }));
 
-mock.module('./subtitles.workflow', () => ({
-    extractSubtitlesWorkflow: async (data: unknown) => {
-        calls.extractSubtitlesWorkflow.push(data);
-        return extractSubtitlesWorkflowImpl(data);
-    },
-    downloadSubtitlesWorkflow: (...args: unknown[]) => {
-        calls.downloadSubtitlesWorkflow.push(args);
-        return downloadSubtitlesWorkflowImpl(...args);
+mock.module('@utils/subs', () => ({
+    normalizeLanguage: () => null,
+    createSubtitleName: (lang: string) => lang,
+}));
+
+mock.module('@shared/lib/opensubs', () => ({
+    subtitlesClient: {
+        getSubtitles: async (opts: unknown) => {
+            calls.getSubtitles.push(opts);
+            return await getSubtitlesImpl(opts);
+        },
+        downloadSubtitle: async () => ({ link: 'https://example.com/sub.srt' }),
     },
 }));
 
@@ -195,12 +211,19 @@ describe('processVideoWorkflow', () => {
         unlinkImpl = async () => {};
         mkdirImpl = async () => {};
         rmImpl = async () => {};
-        extractSubtitlesWorkflowImpl = async () => {};
-        downloadSubtitlesWorkflowImpl = async () => {};
         notifyJobStatusImpl = async () => {};
         computeHashImpl = async () => 'mocked-hash';
-        systemSettingsGetImpl = async () => ({ features: { autoTranscoding: 'smart' } });
+        systemSettingsGetImpl = async () => ({
+            features: { autoTranscoding: 'smart' },
+            preferences: {
+                subtitles: [
+                    { lang: 'en', variants: 1 },
+                    { lang: 'sr', variants: 1 },
+                ],
+            },
+        });
         startProcessingImpl = async () => {};
+        getSubtitlesImpl = async (_opts) => [];
         loggerErrorImpl = (...args: unknown[]) => {
             calls.loggerErrors.push(args);
         };
@@ -279,9 +302,8 @@ describe('processVideoWorkflow', () => {
         expect(calls.copyFile[0]).toMatchObject({ from: '/tmp/upload.mkv' });
         expect(calls.copyFile[0]?.to).toMatch(/^\/storage\/videos\/video-1\/.+\/index\.mkv$/);
         expect(calls.unlink).toContain('/tmp/upload.mkv');
-        expect(calls.extractSubtitlesWorkflow).toHaveLength(1);
         expect(calls.computeHash).toHaveLength(1);
-        expect(calls.downloadSubtitlesWorkflow).toHaveLength(1);
+        expect(calls.getSubtitles).toHaveLength(1);
         expect(calls.startProcessing).toHaveLength(1);
         expect(calls.startProcessing[0]).toEqual([
             'video-1',
@@ -311,10 +333,18 @@ describe('processVideoWorkflow', () => {
     });
 
     test('logs subtitle download failures without failing the workflow', async () => {
-        downloadSubtitlesWorkflowImpl = async () => {
+        getSubtitlesImpl = async () => {
             throw new Error('subtitle provider down');
         };
-        systemSettingsGetImpl = async () => ({ features: { autoTranscoding: 'compatibility' } });
+        systemSettingsGetImpl = async () => ({
+            features: { autoTranscoding: 'compatibility' },
+            preferences: {
+                subtitles: [
+                    { lang: 'en', variants: 1 },
+                    { lang: 'sr', variants: 1 },
+                ],
+            },
+        });
 
         await expect(
             processVideoWorkflow({
