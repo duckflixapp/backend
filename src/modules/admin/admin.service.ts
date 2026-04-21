@@ -9,6 +9,7 @@ import { toSystemStatisticsDTO } from '@shared/mappers/system.mapper';
 import { env } from '@core/env';
 import { taskHandler } from '@utils/taskHandler';
 import { liveSessionManager } from '@modules/media/live.service';
+import { createAuditLog } from '@shared/services/audit.service';
 
 export const getUsersWithRoles = async (): Promise<UserDTO[]> => {
     const rolesIncluded = roles.filter((r) => isAtLeast(r, 'watcher'));
@@ -23,26 +24,53 @@ export const getUsersWithRoles = async (): Promise<UserDTO[]> => {
 export const changeUserRole = async (email: string, role: UserRole, context: { userId: string }): Promise<void> => {
     return await db.transaction(async (tx) => {
         const [user] = await tx
-            .select({ id: users.id })
+            .select({ id: users.id, email: users.email, role: users.role })
             .from(users)
             .where(and(eq(users.email, email), eq(users.system, false)));
         if (!user) throw new AppError('User not found, no changes were made', { statusCode: 404 });
         if (user.id == context.userId) throw new AppError('You are not allowed to change your own role', { statusCode: 403 });
 
         await tx.update(users).set({ role }).where(eq(users.id, user.id));
+        await createAuditLog(
+            {
+                actorUserId: context.userId,
+                action: 'admin.user.role_changed',
+                targetType: 'user',
+                targetId: user.id,
+                metadata: {
+                    email: user.email,
+                    previousRole: user.role,
+                    nextRole: role,
+                },
+            },
+            tx
+        );
     });
 };
 
 export const deleteUser = async (email: string, context: { userId: string }): Promise<void> => {
     return await db.transaction(async (tx) => {
         const [user] = await tx
-            .select({ id: users.id })
+            .select({ id: users.id, email: users.email, role: users.role })
             .from(users)
             .where(and(eq(users.email, email), eq(users.system, false)));
         if (!user) throw new AppError('User not found, no changes were made', { statusCode: 404 });
         if (user.id == context.userId) throw new AppError('You are not allowed to delete your own account', { statusCode: 403 });
 
         await tx.delete(users).where(eq(users.id, user.id));
+        await createAuditLog(
+            {
+                actorUserId: context.userId,
+                action: 'admin.user.deleted',
+                targetType: 'user',
+                targetId: user.id,
+                metadata: {
+                    email: user.email,
+                    role: user.role,
+                },
+            },
+            tx
+        );
     });
 };
 
