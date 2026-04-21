@@ -1,7 +1,7 @@
 import { Elysia } from 'elysia';
 import { authGuard } from '@shared/middlewares/auth.middleware';
 import { toSystemDTO } from '@shared/mappers/system.mapper';
-import { changeUserRoleSchema, systemSettingsUpdateSchema, userSchema } from './admin.validator';
+import { auditLogsQuerySchema, changeUserRoleSchema, systemSettingsUpdateSchema, userSchema } from './admin.validator';
 import * as AdminService from './admin.service';
 import { createRateLimit } from '@shared/configs/ratelimit';
 import { systemSettings } from '@shared/services/system.service';
@@ -38,6 +38,14 @@ export const adminRouter = new Elysia({ prefix: '/admin' })
             return { status: 'success', data: { users } };
         },
         { detail: { tags: ['Admin'], summary: 'List Users' } }
+    )
+    .get(
+        '/audit-logs',
+        async ({ query }) => {
+            const auditLogs = await AdminService.listAuditLogs(query);
+            return { status: 'success', ...auditLogs };
+        },
+        { query: auditLogsQuerySchema, detail: { tags: ['Admin'], summary: 'Audit Logs' } }
     )
     .patch(
         '/users',

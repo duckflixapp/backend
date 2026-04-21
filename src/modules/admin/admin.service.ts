@@ -9,9 +9,10 @@ import { toSystemStatisticsDTO } from '@shared/mappers/system.mapper';
 import { env } from '@core/env';
 import { taskHandler } from '@utils/taskHandler';
 import { liveSessionManager } from '@modules/media/live.service';
-import { createAuditLog } from '@shared/services/audit.service';
+import { createAuditLog, getAuditLogs, type AuditLogListItem } from '@shared/services/audit.service';
 import { systemSettings } from '@shared/services/system.service';
 import type { SystemSettingsT } from '@shared/schema';
+import type { PaginatedResponse } from '@duckflixapp/shared';
 
 type DeepPartial<T> = {
     [K in keyof T]?: NonNullable<T[K]> extends Array<infer U>
@@ -131,6 +132,15 @@ export const updateSystemSettings = async (
     });
 
     return system;
+};
+
+export const listAuditLogs = async (options: {
+    page: number;
+    limit: number;
+    action?: string;
+    actorUserId?: string;
+}): Promise<PaginatedResponse<AuditLogListItem>> => {
+    return getAuditLogs(options);
 };
 
 export const getSystemStatistics = async (): Promise<SystemStatisticsDTO> => {
