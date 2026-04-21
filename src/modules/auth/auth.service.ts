@@ -4,7 +4,13 @@ import { db } from '@shared/configs/db';
 import { accountTokens, sessions, users } from '@shared/schema';
 import { libraries } from '@schema/library.schema';
 import { and, eq } from 'drizzle-orm';
-import { EmailAlreadyExistsError, InvalidCredentialsError, UserNotCreatedError } from './auth.errors';
+import {
+    AuthTemporarilyLockedError,
+    EmailAlreadyExistsError,
+    InvalidCredentialsError,
+    TooManyAuthAttemptsError,
+    UserNotCreatedError,
+} from './auth.errors';
 import type { UserDTO } from '@duckflixapp/shared';
 import { toUserDTO } from '@shared/mappers/user.mapper';
 import { signToken } from '@utils/jwt';
@@ -24,9 +30,34 @@ const getAuthMetadata = (context: { ip?: string; userAgent?: string }) => ({
     userAgent: context.userAgent ?? null,
 });
 
+const auditAuthRateLimit = async (
+    scope: 'login' | 'register',
+    email: string,
+    error: TooManyAuthAttemptsError | AuthTemporarilyLockedError
+) => {
+    await createAuditLog({
+        action: `auth.${scope}.rate_limited`,
+        targetType: 'auth_attempt',
+        metadata: {
+            email,
+            retryAfterSeconds:
+                typeof error.details === 'object' && error.details && 'retryAfterSeconds' in error.details
+                    ? error.details.retryAfterSeconds
+                    : null,
+        },
+    });
+};
+
 export const register = async (name: string, email: string, pass: string): Promise<UserDTO> => {
     const normalizedEmail = normalizeEmail(email);
-    authAttemptLimiter.checkRegister(normalizedEmail);
+    try {
+        authAttemptLimiter.checkRegister(normalizedEmail);
+    } catch (error) {
+        if (error instanceof TooManyAuthAttemptsError || error instanceof AuthTemporarilyLockedError) {
+            await auditAuthRateLimit('register', normalizedEmail, error);
+        }
+        throw error;
+    }
 
     const sysSettings = await systemSettings.get();
     const registration = sysSettings.features.registration;
@@ -90,6 +121,18 @@ export const register = async (name: string, email: string, pass: string): Promi
                 logger.error({ err: e, email: user.email }, 'Failed to send verification email');
             });
 
+        await createAuditLog({
+            actorUserId: user.id,
+            action: 'auth.register.succeeded',
+            targetType: 'user',
+            targetId: user.id,
+            metadata: {
+                email: user.email,
+                role: user.role,
+                verifiedEmail: user.verified_email,
+            },
+        });
+
         return toUserDTO(user);
     } catch (error) {
         authAttemptLimiter.recordFailedRegister(normalizedEmail);
@@ -107,10 +150,22 @@ export const verifyEmail = async (token: string) => {
         throw new AppError('Invalid or expired token', { statusCode: 400 });
     }
 
+    const [user] = await db.select({ id: users.id, email: users.email }).from(users).where(eq(users.id, storedToken.userId));
+
     await db.transaction(async (tx) => {
         await tx.update(users).set({ verified_email: true }).where(eq(users.id, storedToken.userId));
 
         await tx.delete(accountTokens).where(eq(accountTokens.id, storedToken.id));
+    });
+
+    await createAuditLog({
+        actorUserId: storedToken.userId,
+        action: 'auth.email.verified',
+        targetType: 'user',
+        targetId: storedToken.userId,
+        metadata: {
+            email: user?.email ?? null,
+        },
     });
 };
 
@@ -120,7 +175,14 @@ export const login = async (
     context: { ip?: string; userAgent?: string }
 ): Promise<{ token: string; refreshToken: string; user: UserDTO }> => {
     const normalizedEmail = normalizeEmail(email);
-    authAttemptLimiter.checkLogin(normalizedEmail);
+    try {
+        authAttemptLimiter.checkLogin(normalizedEmail);
+    } catch (error) {
+        if (error instanceof TooManyAuthAttemptsError || error instanceof AuthTemporarilyLockedError) {
+            await auditAuthRateLimit('login', normalizedEmail, error);
+        }
+        throw error;
+    }
 
     const user = await db.query.users.findFirst({ where: and(eq(users.email, normalizedEmail), eq(users.system, false)) });
 
@@ -157,16 +219,32 @@ export const login = async (
 
     const token = signToken({ sub: user.id, role: user.role, isVerified: user.verified_email });
     const refreshToken = crypto.randomUUID();
+    let sessionId = '';
 
-    await db.insert(sessions).values({
-        userId: user.id,
-        token: refreshToken,
-        ipAddress: context.ip,
-        userAgent: context.userAgent,
-        expiresAt: new Date(Date.now() + limits.authentication.session_expiry_ms),
-    });
+    const [session] = await db
+        .insert(sessions)
+        .values({
+            userId: user.id,
+            token: refreshToken,
+            ipAddress: context.ip,
+            userAgent: context.userAgent,
+            expiresAt: new Date(Date.now() + limits.authentication.session_expiry_ms),
+        })
+        .returning({ id: sessions.id });
+
+    if (session) sessionId = session.id;
 
     authAttemptLimiter.resetLogin(normalizedEmail);
+    await createAuditLog({
+        actorUserId: user.id,
+        action: 'session.created',
+        targetType: 'session',
+        targetId: sessionId || null,
+        metadata: {
+            source: 'login',
+            ...getAuthMetadata(context),
+        },
+    });
     await createAuditLog({
         actorUserId: user.id,
         action: 'auth.login.succeeded',
@@ -267,6 +345,19 @@ export const refresh = async (oldToken: string) => {
             .returning({ id: sessions.id });
 
         if (newSession) newSessionId = newSession.id;
+    });
+
+    await createAuditLog({
+        actorUserId: user.id,
+        action: 'session.created',
+        targetType: 'session',
+        targetId: newSessionId || session.id,
+        metadata: {
+            source: 'refresh',
+            previousSessionId: session.id,
+            ip: session.ipAddress ?? null,
+            userAgent: session.userAgent ?? null,
+        },
     });
 
     await createAuditLog({
