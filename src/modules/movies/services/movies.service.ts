@@ -7,8 +7,8 @@ import { toMovieDetailedDTO, toMovieDTO } from '@shared/mappers/movies.mapper';
 import { AppError } from '@shared/errors';
 import type { MovieMetadata } from '@shared/services/metadata/metadata.types';
 import { getMovieGenreIds } from './genres.service';
-import { getMovieCastFromTMDBId } from '@shared/services/metadata/providers/tmdb.provider';
 import { logger } from '@shared/configs/logger';
+import { getOrSyncMovieCast, syncMovieCast } from '@shared/services/cast.service';
 
 const getOrderBy = (orderBy: string | null) => {
     switch (orderBy) {
@@ -97,8 +97,11 @@ export const getMovies = async (options: {
 };
 
 export const updateMovieById = async (id: string, data: Partial<MovieMetadata>): Promise<MovieDetailedDTO> => {
+    let tmdbId: number | null = null;
+    const shouldSyncCast = typeof data.tmdbId === 'number';
+
     await db.transaction(async (tx) => {
-        const modified = await tx
+        const [modified] = await tx
             .update(movies)
             .set({
                 title: data.title,
@@ -107,10 +110,13 @@ export const updateMovieById = async (id: string, data: Partial<MovieMetadata>):
                 rating: data.rating?.toString() ?? null,
                 bannerUrl: data.bannerUrl,
                 posterUrl: data.posterUrl,
+                tmdbId: data.tmdbId,
             })
-            .where(eq(movies.id, id));
+            .where(eq(movies.id, id))
+            .returning({ id: movies.id, tmdbId: movies.tmdbId });
 
-        if (modified.rowCount === 0) throw new MovieNotFoundError();
+        if (!modified) throw new MovieNotFoundError();
+        tmdbId = modified.tmdbId;
 
         if (data.genres) {
             const genreIds = await getMovieGenreIds(data.genres);
@@ -127,6 +133,12 @@ export const updateMovieById = async (id: string, data: Partial<MovieMetadata>):
             }
         }
     });
+
+    if (tmdbId && shouldSyncCast) {
+        await syncMovieCast(id, tmdbId).catch((err) => {
+            logger.warn({ err, movieId: id, tmdbId }, 'Failed to sync movie cast after update');
+        });
+    }
 
     return getMovieById(id);
 };
@@ -167,12 +179,10 @@ export const getMovieById = async (id: string, options: { userId: string | null 
               .where(and(eq(libraries.type, 'watchlist'), eq(libraries.userId, options.userId), eq(libraryItems.movieId, id)))
         : Promise.resolve(null);
 
-    const castPromise = result.tmdbId
-        ? getMovieCastFromTMDBId(result.tmdbId).catch((err) => {
-              logger.warn({ err, movieId: id, tmdbId: result.tmdbId }, 'Failed to fetch TMDB movie cast');
-              return [];
-          })
-        : Promise.resolve([]);
+    const castPromise = getOrSyncMovieCast(result.id, result.tmdbId).catch((err) => {
+        logger.warn({ err, movieId: id, tmdbId: result.tmdbId }, 'Failed to load movie cast');
+        return [];
+    });
 
     const [libraryCount, cast] = await Promise.all([inLibraryPromise, castPromise]);
     const inLibrary = !!libraryCount?.[0]?.value && libraryCount[0].value > 0;
