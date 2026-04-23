@@ -30,4 +30,5 @@ export const toGenreDTO = (genre: Genre) => ({
 export const toMovieDetailedDTO = (movie: RichMovieWithVideo, inUserLibrary?: boolean | null): MovieDetailedDTO => ({
     ...toMovieDTO(movie),
     inUserLibrary: inUserLibrary ?? null,
+    cast: [],
 });

@@ -7,6 +7,8 @@ import { toMovieDetailedDTO, toMovieDTO } from '@shared/mappers/movies.mapper';
 import { AppError } from '@shared/errors';
 import type { MovieMetadata } from '@shared/services/metadata/metadata.types';
 import { getMovieGenreIds } from './genres.service';
+import { getMovieCastFromTMDBId } from '@shared/services/metadata/providers/tmdb.provider';
+import { logger } from '@shared/configs/logger';
 
 const getOrderBy = (orderBy: string | null) => {
     switch (orderBy) {
@@ -157,18 +159,28 @@ export const getMovieById = async (id: string, options: { userId: string | null 
 
     if (!result) throw new MovieNotFoundError();
 
-    let inLibrary: boolean | null = null;
-    if (options.userId) {
-        const [libraryCount] = await db
-            .select({ value: count() })
-            .from(libraries)
-            .leftJoin(libraryItems, eq(libraries.id, libraryItems.libraryId))
-            .where(and(eq(libraries.type, 'watchlist'), eq(libraries.userId, options.userId), eq(libraryItems.movieId, id)));
+    const inLibraryPromise = options.userId
+        ? db
+              .select({ value: count() })
+              .from(libraries)
+              .leftJoin(libraryItems, eq(libraries.id, libraryItems.libraryId))
+              .where(and(eq(libraries.type, 'watchlist'), eq(libraries.userId, options.userId), eq(libraryItems.movieId, id)))
+        : Promise.resolve(null);
 
-        inLibrary = !!libraryCount?.value && libraryCount?.value > 0;
-    }
+    const castPromise = result.tmdbId
+        ? getMovieCastFromTMDBId(result.tmdbId).catch((err) => {
+              logger.warn({ err, movieId: id, tmdbId: result.tmdbId }, 'Failed to fetch TMDB movie cast');
+              return [];
+          })
+        : Promise.resolve([]);
 
-    return toMovieDetailedDTO(result, inLibrary);
+    const [libraryCount, cast] = await Promise.all([inLibraryPromise, castPromise]);
+    const inLibrary = !!libraryCount?.[0]?.value && libraryCount[0].value > 0;
+
+    return {
+        ...toMovieDetailedDTO(result, inLibrary),
+        cast,
+    };
 };
 
 export const getFeatured = async (options: { userId: string | null } = { userId: null }) => {

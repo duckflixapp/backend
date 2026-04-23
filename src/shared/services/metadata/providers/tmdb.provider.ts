@@ -1,6 +1,8 @@
 import { AppError } from '@shared/errors';
 import type { EpisodeMetadata, MovieMetadata } from '../metadata.types';
 import { tmdbClient } from '@shared/lib/tmdb';
+import { toCastMemberDTO } from '@shared/mappers/cast.mapper';
+import type { CastMemberDTO } from '@duckflixapp/shared';
 
 // ----- IMDB ID -----
 export const fillFromIMDBId = async (imdbId: string) => {
@@ -71,6 +73,15 @@ export const fillEpisodeFromTMDBIds = async (seriesId: number, seasonNumber: num
     };
 };
 
+export const getEpisodeCastFromTMDBIds = async (
+    seriesId: number,
+    seasonNumber: number,
+    episodeNumber: number
+): Promise<CastMemberDTO[]> => {
+    const raw = await tmdbClient.getEpisodeCredits(seriesId, seasonNumber, episodeNumber);
+    return [...raw.cast, ...raw.guest_stars].sort((a, b) => a.order - b.order).map(toCastMemberDTO);
+};
+
 // ------------------------------------
 // Movies
 // ------------------------------------
@@ -92,6 +103,11 @@ export const fillMovieFromTMDBId = async (id: string): Promise<MovieMetadata> =>
         imdbId: raw.imdb_id,
         tmdbId: Number(raw.id),
     };
+};
+
+export const getMovieCastFromTMDBId = async (id: number | string): Promise<CastMemberDTO[]> => {
+    const raw = await tmdbClient.getMovieCredits(id);
+    return raw.cast.sort((a, b) => a.order - b.order).map(toCastMemberDTO);
 };
 
 export const searchTMDB = async (data: {

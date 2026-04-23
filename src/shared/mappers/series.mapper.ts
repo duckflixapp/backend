@@ -37,6 +37,7 @@ export const toEpisodeDTO = (episode: SeriesEpisode & { season: SeriesSeason; vi
     overview: episode.overview ?? null,
     season: toSeasonMinDTO(episode.season),
     video: episode.video ? toVideoDTO(episode.video) : null,
+    cast: [],
 });
 
 // ---- Season ----
