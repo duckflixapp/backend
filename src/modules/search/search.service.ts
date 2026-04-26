@@ -4,8 +4,8 @@ import { series } from '@schema/series.schema';
 import { and, asc, count, desc, sql } from 'drizzle-orm';
 import { db } from '@shared/configs/db';
 import { searchFromQuery, toSeriesGenresFilter, toMovieGenresFilter } from './search.helper';
-import { unionAll } from 'drizzle-orm/pg-core';
 import { toContentDTOFromRow } from '@shared/mappers/content.mapper';
+import { unionAll } from 'drizzle-orm/sqlite-core';
 
 interface SearchOptions {
     q: string | null;
@@ -33,7 +33,7 @@ export const unifiedSearch = async (options: SearchOptions): Promise<PaginatedRe
                 image: movies.posterUrl,
                 rating: movies.rating,
                 createdAt: movies.createdAt,
-                release: sql<string>`coalesce(${movies.releaseYear}::text, '')`.as('release'),
+                release: sql<string>`coalesce(cast(${movies.releaseYear} as text), '')`.as('release'),
                 rank: rankMovies.as('rank'), // Expose rank so we can sort the union by it
             })
             .from(movies)
@@ -47,7 +47,7 @@ export const unifiedSearch = async (options: SearchOptions): Promise<PaginatedRe
                 image: series.posterUrl,
                 rating: series.rating,
                 createdAt: series.createdAt,
-                release: sql<string>`coalesce(left(${series.firstAirDate}, 4), '')`.as('release'),
+                release: sql<string>`coalesce(substr(${series.firstAirDate}, 1, 4), '')`.as('release'),
                 rank: rankSeries.as('rank'),
             })
             .from(series)
