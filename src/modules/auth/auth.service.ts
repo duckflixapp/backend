@@ -389,7 +389,7 @@ export const stepUp = async (
         where: and(eq(users.id, userId), eq(users.system, false)),
     });
 
-    if (!user) throw new InvalidCredentialsError();
+    if (!user) throw new AppError('Failed to verify user', { statusCode: 401 });
 
     if (method === 'password') {
         const isValid = await argon2.verify(user.password, credential);
@@ -408,4 +408,18 @@ export const stepUp = async (
     });
 
     return { token, expiresIn };
+};
+
+export const getVerificationMethods = async (userId: string): Promise<string[]> => {
+    const user = await db.query.users.findFirst({
+        where: and(eq(users.id, userId), eq(users.system, false)),
+    });
+
+    if (!user) throw new AppError('Failed to verify user', { statusCode: 401 });
+
+    const methods: string[] = [];
+
+    if (!!user.password) methods.push('password');
+
+    return methods;
 };

@@ -104,15 +104,26 @@ export const authRouter = new Elysia({ prefix: '/auth' })
         },
         { auth: { verified: false }, detail: { tags: ['Auth'], summary: 'Logout' } }
     )
-    .post(
-        '/step-up',
-        async ({ body, user }) => {
-            const result = await AuthService.stepUp(user.id, body.scope, body.method, body.credential);
-            return { status: 'success', data: result };
-        },
-        {
-            body: stepUpSchema,
-            detail: { tags: ['Auth'], summary: 'Step up authentication' },
-            auth: { verified: false },
-        }
+    .group('/step-up', (app) =>
+        app
+            .guard({ auth: { verified: false } })
+            .post(
+                '/',
+                async ({ body, user }) => {
+                    const result = await AuthService.stepUp(user.id, body.scope, body.method, body.credential);
+                    return { status: 'success', data: result };
+                },
+                {
+                    body: stepUpSchema,
+                    detail: { tags: ['Auth'], summary: 'Step up authentication' },
+                }
+            )
+            .get(
+                '/methods',
+                async ({ user }) => {
+                    const methods = await AuthService.getVerificationMethods(user.id);
+                    return { status: 'success', data: { methods } };
+                },
+                { detail: { tags: ['Auth'], summary: 'Authentication methods to step up' } }
+            )
     );
