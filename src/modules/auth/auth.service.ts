@@ -23,6 +23,7 @@ import { logger } from '@shared/configs/logger';
 import { isDuplicateKey } from '@shared/db.errors';
 import { authAttemptLimiter } from './auth-attempt-limiter';
 import { createAuditLog } from '@shared/services/audit.service';
+import { verify } from 'otplib';
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 const getAuthMetadata = (context: { ip?: string; userAgent?: string }) => ({
@@ -394,6 +395,11 @@ export const stepUp = async (
     if (method === 'password') {
         const isValid = await argon2.verify(user.password, credential);
         if (!isValid) throw new InvalidCredentialsError();
+    } else if (method === 'totp') {
+        if (!user.totp_secret || !user.totp_enabled) throw new AppError('TOTP not configured', { statusCode: 400 });
+
+        const result = await verify({ token: credential, secret: user.totp_secret });
+        if (!result.valid) throw new AppError('Invalid code', { statusCode: 400 });
     } else throw new AppError('Unsupported method', { statusCode: 400 });
 
     const expiresIn = 7 * 60 * 1000;
@@ -420,6 +426,7 @@ export const getVerificationMethods = async (userId: string): Promise<string[]> 
     const methods: string[] = [];
 
     if (!!user.password) methods.push('password');
+    if (user.totp_enabled && !!user.totp_secret) methods.push('totp');
 
     return methods;
 };

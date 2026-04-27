@@ -1,7 +1,7 @@
 import { authGuard } from '@shared/middlewares/auth.middleware';
 import Elysia from 'elysia';
-import { resetPasswordSchema } from './account.schema';
-import { resetPassword } from './account.service';
+import { resetPasswordSchema, setupTotpSchema } from './account.schema';
+import { activateTotp, cancelTotpSetup, getTotpSetup, resetPassword } from './account.service';
 
 export const accountRouter = new Elysia({ prefix: '/account' })
     .use(authGuard)
@@ -14,4 +14,28 @@ export const accountRouter = new Elysia({ prefix: '/account' })
             return { status: 'success' };
         },
         { body: resetPasswordSchema, detail: { tags: ['Account'], summary: 'Change Password' } }
+    )
+    .get(
+        '/authenticator/setup',
+        async ({ user }) => {
+            const data = await getTotpSetup(user.id);
+            return { status: 'success', data };
+        },
+        { detail: { tags: ['Account'], summary: 'Get TOTP Setup QR' } }
+    )
+    .delete(
+        '/authenticator/setup',
+        async ({ user, status }) => {
+            await cancelTotpSetup(user.id);
+            return status(204, { status: 'success' });
+        },
+        { detail: { tags: ['Account'], summary: 'Activate TOTP' } }
+    )
+    .post(
+        '/authenticator/setup',
+        async ({ body, user }) => {
+            const data = await activateTotp(user.id, body.code);
+            return { status: 'success', data };
+        },
+        { body: setupTotpSchema, detail: { tags: ['Account'], summary: 'Activate TOTP' } }
     );

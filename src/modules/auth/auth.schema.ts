@@ -23,7 +23,7 @@ export const verifyEmailSchema = z.object({
 
 export const stepUpSchema = z.object({
     scope: z.enum(['sensitive:read', 'sensitive:write']),
-    method: z.enum(['password']),
+    method: z.enum(['password', 'totp']),
     credential: z.string(),
 });
 
